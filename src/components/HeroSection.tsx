@@ -6,6 +6,7 @@ interface HeroSectionProps {
   totalDiscourses: number;
   totalTips: number;
   totalEvents: number;
+  isOwner: boolean;
   onEnterReadingRoom: () => void;
   onExploreEvents: () => void;
   onOpenGitHubStudio: () => void;
@@ -15,6 +16,7 @@ export function HeroSection({
   totalDiscourses,
   totalTips,
   totalEvents,
+  isOwner,
   onEnterReadingRoom,
   onExploreEvents,
   onOpenGitHubStudio,
@@ -99,16 +101,27 @@ export function HeroSection({
           </div>
           <div>
             <dt className="text-xs tracking-wider uppercase text-[#78716C] dark:text-[#A8A29E]">
-              GitHub Pages Publishing
+              {isOwner ? 'GitHub Pages Publishing' : 'Open Dhamma Archive'}
             </dt>
             <dd className="mt-1.5">
-              <button
-                type="button"
-                onClick={onOpenGitHubStudio}
-                className="font-mono-code text-sm text-[#9A3412] dark:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer text-left break-all"
-              >
-                theartofnoting.github.io/dhamma_content
-              </button>
+              {isOwner ? (
+                <button
+                  type="button"
+                  onClick={onOpenGitHubStudio}
+                  className="font-mono-code text-sm text-[#9A3412] dark:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer text-left break-all"
+                >
+                  theartofnoting.github.io/dhamma_content
+                </button>
+              ) : (
+                <a
+                  href="https://github.com/theartofnoting/dhamma_content"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono-code text-sm text-[#9A3412] dark:text-[#FDBA74] hover:underline underline-offset-4 text-left break-all"
+                >
+                  theartofnoting.github.io/dhamma_content
+                </a>
+              )}
             </dd>
           </div>
         </div>

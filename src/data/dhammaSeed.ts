@@ -10,6 +10,7 @@ export const NIKAYA_SCROLLS_IMAGE = `${BASE}src/assets/images/sayadaw_nikaya_scr
 export const SAYADAW_PROFILES: SayadawProfile[] = [
   {
     id: 'nandamalabhivamsa',
+    slug: 'ven-nandamalabhivamsa',
     name: 'Ven. Dr. Nandamālābhivaṃsa',
     honorificTitle: 'Aggamahāpaṇḍita · Abhidhajamahāraṭṭhaguru',
     chineseName: '南達瑪拉長老（薩亞多）',
@@ -28,6 +29,7 @@ export const SAYADAW_PROFILES: SayadawProfile[] = [
   },
   {
     id: 'mogok-sayadaw',
+    slug: 'ven-mogok',
     name: 'Ven. Mogok Sayadaw (U Vimala)',
     honorificTitle: 'Aggamahāpaṇḍita',
     chineseName: '莫哥薩亞多（Mogok Sayadaw）',
@@ -46,6 +48,7 @@ export const SAYADAW_PROFILES: SayadawProfile[] = [
   },
   {
     id: 'mahasi-sayadaw',
+    slug: 'ven-mahasi',
     name: 'Ven. Mahāsi Sayadaw (U Sobhana)',
     honorificTitle: 'Aggamahāpaṇḍita · Chaṭṭha Saṅgāyana Pucchaka',
     chineseName: '馬哈希薩亞多',
@@ -64,6 +67,7 @@ export const SAYADAW_PROFILES: SayadawProfile[] = [
   },
   {
     id: 'pa-auk-sayadaw',
+    slug: 'ven-pa-auk',
     name: 'Ven. Pa-Auk Sayadaw (U Āciṇṇa)',
     honorificTitle: 'Aggamahāpaṇḍita · Abhidhajamahāraṭṭhaguru',
     chineseName: '帕奧薩亞多',
@@ -81,6 +85,7 @@ export const SAYADAW_PROFILES: SayadawProfile[] = [
   },
   {
     id: 'bhikkhu-uttamo',
+    slug: 'ven-bhikkhu-uttamo',
     name: 'Ven. Bhikkhu Uttamo (Sayadaw U Uttama)',
     honorificTitle: 'Theravāda Dhammakathika',
     chineseName: '鄔達摩長老',
@@ -102,6 +107,8 @@ export const INITIAL_DISCOURSES: DhammaDiscourse[] = [
   {
     id: 'abhidhamma-four-ultimates',
     accessionCode: 'ACC. ABH.01',
+    slug: 'paramattha-dhamma-architecture',
+    collectionSlug: 'abhidhamma',
     title: 'The Architecture of Ultimate Reality: Citta, Cetasika, Rūpa, and Nibbāna',
     chineseTitle: '究竟法之結構：心、心所、色與涅槃',
     paliSubtitle: 'Paramattha Dhamma Vibhāga · Abhidhammattha-saṅgaha I',
@@ -189,6 +196,8 @@ export const INITIAL_DISCOURSES: DhammaDiscourse[] = [
   {
     id: 'mogok-cutting-paticcasamuppada',
     accessionCode: 'ACC. VIP.02',
+    slug: 'vedana-tanha-paticcasamuppada',
+    collectionSlug: 'dhamma-talks-by-mogok-sayadaw',
     title: 'Severing the Wheel Between Vedanā and Taṇhā in Daily Practice',
     chineseTitle: '在日常觀照中截斷受與愛之間的緣起輪',
     paliSubtitle: 'Paṭiccasamuppāda · Cittānupassanā',
@@ -254,6 +263,8 @@ export const INITIAL_DISCOURSES: DhammaDiscourse[] = [
   {
     id: 'mahasi-satipatthana-direct-path',
     accessionCode: 'ACC. SUT.03',
+    slug: 'satipatthana-direct-path',
+    collectionSlug: 'sutta-pitaka',
     title: 'The Direct Path of Bare Awareness: Notes on the Mahāsatipaṭṭhāna Sutta',
     chineseTitle: '大念處經之直入正道：如實觀照與標記法',
     paliSubtitle: 'Ekāyano ayaṃ bhikkhave maggo',
@@ -311,6 +322,8 @@ export const INITIAL_DISCOURSES: DhammaDiscourse[] = [
   {
     id: 'pa-auk-samatha-vipassana',
     accessionCode: 'ACC. VIS.04',
+    slug: 'anapanasati-visuddhimagga',
+    collectionSlug: 'visuddhimagga',
     title: 'From Ānāpānasati to Four-Element Discernment in the Visuddhimagga',
     chineseTitle: '從入出息念至界分別觀：《清淨道論》止觀次第',
     paliSubtitle: 'Samatha-yānika · Dhātuvavatthāna',
@@ -362,6 +375,8 @@ export const INITIAL_DISCOURSES: DhammaDiscourse[] = [
   {
     id: 'uttamo-dhammapada-mind',
     accessionCode: 'ACC. MNK.05',
+    slug: 'dhammapada-twin-verses',
+    collectionSlug: 'monastic-talks',
     title: 'Mind Precedes All Dhammas: Dhammapada Verses 1–2 Commentary',
     chineseTitle: '諸法意先導：《法句經》雙品前二偈要義',
     paliSubtitle: 'Manopubbaṅgamā dhammā, manoseṭṭhā manomayā',
@@ -410,6 +425,8 @@ export const INITIAL_DISCOURSES: DhammaDiscourse[] = [
   {
     id: 'nandamala-patthana-conditions',
     accessionCode: 'ACC. ABH.06',
+    slug: 'patthana-daily-conditions',
+    collectionSlug: 'abhidhamma',
     title: 'The Twenty-Four Conditional Relations (Paṭṭhāna) in Everyday Life',
     chineseTitle: '二十四緣（發趣論）在日常修行中的觀察',
     paliSubtitle: 'Hetupaccayo · Ārammaṇapaccayo · Adhipatipaccayo',

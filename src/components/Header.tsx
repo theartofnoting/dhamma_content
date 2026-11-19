@@ -2,11 +2,12 @@ import { NavSection } from '../types/dhamma';
 
 interface HeaderProps {
   activeSection: NavSection;
+  isOwner: boolean;
   onNavigate: (target: NavSection) => void;
   onOpenStoreModal: () => void;
 }
 
-export function Header({ activeSection, onNavigate, onOpenStoreModal }: HeaderProps) {
+export function Header({ activeSection, isOwner, onNavigate, onOpenStoreModal }: HeaderProps) {
   const navItems: { id: 'discourses' | 'sayadaws' | 'tips' | 'events' | 'forms'; label: string }[] =
     [
       { id: 'discourses', label: 'Discourses' },
@@ -51,13 +52,23 @@ export function Header({ activeSection, onNavigate, onOpenStoreModal }: HeaderPr
         </nav>
 
         <div className="flex items-center shrink-0">
-          <button
-            type="button"
-            onClick={onOpenStoreModal}
-            className="min-h-[40px] px-4 py-2 text-sm font-medium text-[#FBF9F5] bg-[#9A3412] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9A3412]"
-          >
-            Store Teaching
-          </button>
+          {isOwner ? (
+            <button
+              type="button"
+              onClick={onOpenStoreModal}
+              className="min-h-[40px] px-4 py-2 text-sm font-medium text-[#FBF9F5] bg-[#9A3412] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9A3412]"
+            >
+              Store Teaching
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onNavigate('reader')}
+              className="min-h-[40px] px-4 py-2 text-sm font-medium text-[#FBF9F5] bg-[#1C1917] hover:bg-[#9A3412] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#FDBA74] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9A3412]"
+            >
+              Reading Room
+            </button>
+          )}
         </div>
       </div>
 

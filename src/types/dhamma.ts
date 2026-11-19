@@ -13,6 +13,7 @@ export type DiscourseLanguage =
 
 export interface SayadawProfile {
   id: string;
+  slug?: string;
   name: string;
   honorificTitle: string;
   chineseName?: string;
@@ -58,6 +59,9 @@ export interface DiscourseMediaItem {
 export interface DhammaDiscourse {
   id: string;
   accessionCode: string;
+  slug?: string;
+  collectionSlug?: string;
+  sourceFormat?: 'md' | 'rst';
   title: string;
   chineseTitle?: string;
   paliSubtitle?: string;
@@ -160,6 +164,23 @@ export interface GitHubContentEntry {
   html_url: string;
 }
 
+export interface GitHubAuthUser {
+  login: string;
+  name: string | null;
+  avatar_url: string;
+  html_url: string;
+}
+
+export interface PublishedContentManifest {
+  version: number;
+  updatedAt: string;
+  discourses: DhammaDiscourse[];
+  customSayadaws: SayadawProfile[];
+  tips: MeditationTip[];
+  events: GroupEvent[];
+  formTabs: GoogleFormTab[];
+}
+
 export type NavSection =
   | 'discourses'
   | 'sayadaws'
@@ -167,4 +188,5 @@ export type NavSection =
   | 'events'
   | 'forms'
   | 'reader'
-  | 'github';
+  | 'github'
+  | 'login';

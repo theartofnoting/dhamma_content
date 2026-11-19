@@ -6,6 +6,7 @@ import { normalizeGoogleFormUrl } from '../utils/storageAndExport';
 interface FormsEmbedSectionProps {
   formTabs: GoogleFormTab[];
   activeTabId: string;
+  isOwner: boolean;
   onSelectTab: (id: string) => void;
   onSaveFormTab: (tab: GoogleFormTab, isNew: boolean) => void;
   onDeleteFormTab: (id: string) => void;
@@ -14,6 +15,7 @@ interface FormsEmbedSectionProps {
 export function FormsEmbedSection({
   formTabs,
   activeTabId,
+  isOwner,
   onSelectTab,
   onSaveFormTab,
   onDeleteFormTab,
@@ -38,10 +40,10 @@ export function FormsEmbedSection({
       setUrlInput(activeTab.rawUrl);
       setUrlError(null);
       setUrlSavedNotice(false);
-      // Automatically open URL input bar if this tab has no Google Form URL configured yet
-      setShowConfigBar(!activeTab.embedUrl);
+      // Automatically open URL input bar only for signed-in owner if tab has no URL yet
+      setShowConfigBar(isOwner && !activeTab.embedUrl);
     }
-  }, [activeTab?.id]);
+  }, [activeTab?.id, isOwner]);
 
   if (!activeTab) return null;
 
@@ -133,22 +135,25 @@ export function FormsEmbedSection({
             Community Registration &amp; Submission Forms
           </h2>
           <p className="text-sm sm:text-base leading-relaxed text-[#57534E] dark:text-[#A8A29E]">
-            Paste any Google Form URL into a tab below to embed live registration, Sayadaw Q&amp;A,
-            or volunteer forms directly on the Dhamma Page.
+            {isOwner
+              ? 'Paste any Google Form URL into a tab below to embed live registration, Sayadaw Q&A, or volunteer forms directly on the Dhamma Page.'
+              : 'Submit retreat registrations, Sayadaw Dhamma questions, or group volunteer sign-ups using the official forms below.'}
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setNewTabError(null);
-            setIsNewTabModalOpen(true);
-          }}
-          className="inline-flex items-center gap-2 min-h-[42px] px-4 py-2 text-xs font-medium bg-[#1C1917] text-[#FBF9F5] hover:bg-[#9A3412] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#FDBA74] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          <span>Add Form Tab</span>
-        </button>
+        {isOwner && (
+          <button
+            type="button"
+            onClick={() => {
+              setNewTabError(null);
+              setIsNewTabModalOpen(true);
+            }}
+            className="inline-flex items-center gap-2 min-h-[42px] px-4 py-2 text-xs font-medium bg-[#1C1917] text-[#FBF9F5] hover:bg-[#9A3412] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#FDBA74] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            <span>Add Form Tab</span>
+          </button>
+        )}
       </div>
 
       {/* Multi-Form Tab Bar */}
@@ -175,51 +180,53 @@ export function FormsEmbedSection({
           })}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowConfigBar((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
-          >
-            <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>{showConfigBar ? 'Hide Form URL' : 'Configure Form URL'}</span>
-          </button>
+        {isOwner && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowConfigBar((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{showConfigBar ? 'Hide Form URL' : 'Configure Form URL'}</span>
+            </button>
 
-          {formTabs.length > 1 && (
-            <>
-              {confirmDeleteTabId !== activeTab.id ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDeleteTabId(activeTab.id)}
-                  className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#57534E] hover:text-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
-                >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Remove Tab</span>
-                </button>
-              ) : (
-                <span className="inline-flex items-center gap-2 text-xs">
+            {formTabs.length > 1 && (
+              <>
+                {confirmDeleteTabId !== activeTab.id ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      onDeleteFormTab(activeTab.id);
-                      setConfirmDeleteTabId(null);
-                    }}
-                    className="min-h-[38px] px-3 bg-[#9A3412] text-[#FBF9F5] cursor-pointer"
+                    onClick={() => setConfirmDeleteTabId(activeTab.id)}
+                    className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#57534E] hover:text-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
                   >
-                    Confirm Remove
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Remove Tab</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDeleteTabId(null)}
-                    className="px-2 text-[#57534E] cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </span>
-              )}
-            </>
-          )}
-        </div>
+                ) : (
+                  <span className="inline-flex items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDeleteFormTab(activeTab.id);
+                        setConfirmDeleteTabId(null);
+                      }}
+                      className="min-h-[38px] px-3 bg-[#9A3412] text-[#FBF9F5] cursor-pointer"
+                    >
+                      Confirm Remove
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteTabId(null)}
+                      className="px-2 text-[#57534E] cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Active Form Description & Controls */}
@@ -236,30 +243,32 @@ export function FormsEmbedSection({
 
           {activeTab.embedUrl && (
             <div className="flex flex-wrap items-center gap-3 shrink-0">
-              <div
-                role="group"
-                aria-label="Form embed height"
-                className="flex items-center border border-[#D6CEBE] dark:border-[#44403C]"
-              >
-                {[
-                  { label: 'Compact', px: 560 },
-                  { label: 'Standard', px: 760 },
-                  { label: 'Tall', px: 960 },
-                ].map((opt) => (
-                  <button
-                    key={opt.px}
-                    type="button"
-                    onClick={() => handleHeightChange(opt.px)}
-                    className={`min-h-[36px] px-2.5 text-xs cursor-pointer transition-colors ${
-                      activeTab.heightPx === opt.px
-                        ? 'bg-[#1C1917] text-[#FBF9F5] dark:bg-[#F5F5F4] dark:text-[#1C1917]'
-                        : 'text-[#57534E] dark:text-[#A8A29E]'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+              {isOwner && (
+                <div
+                  role="group"
+                  aria-label="Form embed height"
+                  className="flex items-center border border-[#D6CEBE] dark:border-[#44403C]"
+                >
+                  {[
+                    { label: 'Compact', px: 560 },
+                    { label: 'Standard', px: 760 },
+                    { label: 'Tall', px: 960 },
+                  ].map((opt) => (
+                    <button
+                      key={opt.px}
+                      type="button"
+                      onClick={() => handleHeightChange(opt.px)}
+                      className={`min-h-[36px] px-2.5 text-xs cursor-pointer transition-colors ${
+                        activeTab.heightPx === opt.px
+                          ? 'bg-[#1C1917] text-[#FBF9F5] dark:bg-[#F5F5F4] dark:text-[#1C1917]'
+                          : 'text-[#57534E] dark:text-[#A8A29E]'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <a
                 href={activeTab.rawUrl || activeTab.embedUrl}
@@ -275,7 +284,7 @@ export function FormsEmbedSection({
         </div>
 
         {/* URL Configuration Bar */}
-        {showConfigBar && (
+        {isOwner && showConfigBar && (
           <form
             onSubmit={handleApplyUrl}
             className="p-5 border border-[#D6CEBE] dark:border-[#342E28] bg-[#F4EFE6]/55 dark:bg-[#1E1A16] space-y-3"
@@ -359,19 +368,19 @@ export function FormsEmbedSection({
               aria-hidden="true"
             />
             <h4 className="font-display text-2xl font-medium text-[#1C1917] dark:text-[#F5F5F4]">
-              Ready to Embed “{activeTab.label}”
+              {isOwner ? `Ready to Embed “${activeTab.label}”` : `${activeTab.label} — Opening Soon`}
             </h4>
             <p className="text-sm text-[#57534E] dark:text-[#A8A29E] max-w-lg mx-auto leading-relaxed">
-              Paste your group’s Google Form URL in the box above and click{' '}
-              <strong>Save &amp; Embed</strong>. Once saved, participants can fill out and submit
-              the form directly on this page.
+              {isOwner
+                ? 'Paste your group’s Google Form URL in the box above and click Save & Embed. Once saved, participants can fill out and submit the form directly on this page.'
+                : 'This registration form has not been published by the group coordinator yet. Check the Courses & Events calendar above or return shortly.'}
             </p>
           </div>
         )}
       </div>
 
       {/* Add New Form Tab Modal */}
-      {isNewTabModalOpen && (
+      {isOwner && isNewTabModalOpen && (
         <div
           role="dialog"
           aria-modal="true"

@@ -19,12 +19,14 @@ import {
   TraditionCollection,
 } from '../types/dhamma';
 import { calculateEstimatedReadingMinutes } from '../utils/storageAndExport';
+import { buildDiscoursePath } from '../utils/urlRouter';
 import { ArchivalImage } from './ArchivalImage';
 
 interface DiscourseCatalogProps {
   discourses: DhammaDiscourse[];
   sayadaws: SayadawProfile[];
   bookmarks: string[];
+  isOwner: boolean;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   selectedCollection: TraditionCollection | 'All';
@@ -65,6 +67,7 @@ export function DiscourseCatalog({
   discourses,
   sayadaws,
   bookmarks,
+  isOwner,
   searchQuery,
   onSearchChange,
   selectedCollection,
@@ -214,16 +217,18 @@ export function DiscourseCatalog({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() =>
-              onOpenStoreModal(selectedSayadawId !== 'All' ? selectedSayadawId : undefined)
-            }
-            className="inline-flex items-center gap-1.5 min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Add Discourse</span>
-          </button>
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() =>
+                onOpenStoreModal(selectedSayadawId !== 'All' ? selectedSayadawId : undefined)
+              }
+              className="inline-flex items-center gap-1.5 min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Add Discourse</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -440,15 +445,17 @@ export function DiscourseCatalog({
             >
               Reset Filters
             </button>
-            <button
-              type="button"
-              onClick={() =>
-                onOpenStoreModal(selectedSayadawId !== 'All' ? selectedSayadawId : undefined)
-              }
-              className="min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] cursor-pointer"
-            >
-              Store New Teaching
-            </button>
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenStoreModal(selectedSayadawId !== 'All' ? selectedSayadawId : undefined)
+                }
+                className="min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] cursor-pointer"
+              >
+                Store New Teaching
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -675,14 +682,16 @@ export function DiscourseCatalog({
                           {group.items.length} {group.items.length === 1 ? 'discourse' : 'discourses'}
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => onOpenStoreModal(group.sayadawId)}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-[#9A3412] dark:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer"
-                      >
-                        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>Add under this Sayadaw</span>
-                      </button>
+                      {isOwner && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenStoreModal(group.sayadawId)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-[#9A3412] dark:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer"
+                        >
+                          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>Add under this Sayadaw</span>
+                        </button>
+                      )}
                     </div>
 
                     <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28]">
@@ -735,14 +744,16 @@ export function DiscourseCatalog({
                             </div>
 
                             <div className="lg:col-span-2 flex items-center lg:justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => onEditDiscourse(d)}
-                                aria-label={`Edit ${d.title}`}
-                                className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
+                              {isOwner && (
+                                <button
+                                  type="button"
+                                  onClick={() => onEditDiscourse(d)}
+                                  aria-label={`Edit ${d.title}`}
+                                  className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => onToggleBookmark(d.id)}
@@ -799,9 +810,9 @@ export function DiscourseCatalog({
                         <span className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74] tabular-nums">
                           {d.accessionCode}
                         </span>
-                        {d.isUserCreated && (
+                        {isOwner && d.isUserCreated && (
                           <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                            · Local Entry
+                            · Draft
                           </span>
                         )}
                       </div>
@@ -819,6 +830,9 @@ export function DiscourseCatalog({
                           {d.chineseTitle && <span aria-hidden="true">·</span>}
                           <span>{d.sourceText}</span>
                         </div>
+                        <p className="font-mono-code text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
+                          {buildDiscoursePath(d, sayadaws)}
+                        </p>
                       </div>
 
                       <div className="lg:col-span-3 text-xs text-[#57534E] dark:text-[#A8A29E] space-y-0.5">
@@ -851,14 +865,16 @@ export function DiscourseCatalog({
                       </div>
 
                       <div className="lg:col-span-2 flex items-center lg:justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => onEditDiscourse(d)}
-                          aria-label={`Edit ${d.title}`}
-                          className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
+                        {isOwner && (
+                          <button
+                            type="button"
+                            onClick={() => onEditDiscourse(d)}
+                            aria-label={`Edit ${d.title}`}
+                            className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => onToggleBookmark(d.id)}

@@ -2,22 +2,27 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Bookmark,
+  Check,
   Clock,
+  Copy,
   Download,
   Moon,
   Pencil,
   Sun,
   Trash2,
 } from 'lucide-react';
-import { DhammaDiscourse, ReaderPreferences } from '../types/dhamma';
+import { DhammaDiscourse, ReaderPreferences, SayadawProfile } from '../types/dhamma';
 import { calculateEstimatedReadingMinutes } from '../utils/storageAndExport';
+import { buildDiscoursePath } from '../utils/urlRouter';
 import { ArchivalImage } from './ArchivalImage';
 import { DiscourseMediaBlock } from './DiscourseMediaBlock';
 
 interface ReadingRoomProps {
   discourse: DhammaDiscourse;
   allDiscourses: DhammaDiscourse[];
+  sayadaws: SayadawProfile[];
   isBookmarked: boolean;
+  isOwner: boolean;
   prefs: ReaderPreferences;
   onUpdatePrefs: (prefs: ReaderPreferences) => void;
   onBackToCatalog: () => void;
@@ -32,7 +37,9 @@ interface ReadingRoomProps {
 export function ReadingRoom({
   discourse,
   allDiscourses,
+  sayadaws,
   isBookmarked,
+  isOwner,
   prefs,
   onUpdatePrefs,
   onBackToCatalog,
@@ -45,8 +52,10 @@ export function ReadingRoom({
 }: ReadingRoomProps) {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const articleRef = useRef<HTMLElement>(null);
   const estimatedMinutes = calculateEstimatedReadingMinutes(discourse);
+  const canonicalPath = buildDiscoursePath(discourse, sayadaws);
 
   useEffect(() => {
     setConfirmDelete(false);
@@ -190,16 +199,18 @@ export function ReadingRoom({
               <span>Export .md</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => onEditDiscourse(discourse)}
-              className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
-            >
-              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Edit Content &amp; Media</span>
-            </button>
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => onEditDiscourse(discourse)}
+                className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Edit Content &amp; Media</span>
+              </button>
+            )}
 
-            {discourse.isUserCreated && (
+            {isOwner && discourse.isUserCreated && (
               <>
                 {!confirmDelete ? (
                   <button
@@ -435,18 +446,51 @@ export function ReadingRoom({
               )}
             </div>
 
-            {/* Repository File Metadata */}
+            {/* Canonical Indexed URL & Repository Source Path */}
             <div className="p-5 border border-[#E5DFD3] dark:border-[#342E28] space-y-3">
-              <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
-                GitHub Pages Source Path
-              </p>
-              <p className="font-mono-code text-xs break-all text-[#1C1917] dark:text-[#F5F5F4]">
-                {discourse.repoPath}
-              </p>
-              <p className="text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
-                Export as Markdown with YAML frontmatter to commit directly into{' '}
-                <span className="font-mono-code">theartofnoting/dhamma_content</span>.
-              </p>
+              <div className="space-y-1">
+                <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
+                  Sayadaw Index Permalink
+                </p>
+                <p className="font-mono-code text-xs break-all text-[#9A3412] dark:text-[#FDBA74]">
+                  {canonicalPath}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const fullUrl = `${window.location.origin}${canonicalPath}`;
+                    await navigator.clipboard.writeText(fullUrl);
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 1800);
+                  } catch {
+                    // Ignore clipboard error
+                  }
+                }}
+                className="w-full inline-flex items-center justify-center gap-1.5 min-h-[36px] px-3 py-1.5 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-[#14532D] dark:text-[#86EFAC]" />
+                    <span>Permalink Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Copy Discourse URL</span>
+                  </>
+                )}
+              </button>
+
+              <div className="pt-3 border-t border-[#E5DFD3] dark:border-[#342E28] space-y-1">
+                <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
+                  Repository Source ({discourse.sourceFormat === 'rst' ? 'reStructuredText' : 'Markdown'})
+                </p>
+                <p className="font-mono-code text-xs break-all text-[#1C1917] dark:text-[#F5F5F4]">
+                  {discourse.repoPath}
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => onExportMarkdown(discourse)}

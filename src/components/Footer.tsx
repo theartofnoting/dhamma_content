@@ -3,11 +3,13 @@ import { ExternalLink } from 'lucide-react';
 import { NavSection } from '../types/dhamma';
 
 interface FooterProps {
+  isOwner: boolean;
+  ownerLogin?: string | null;
   onNavigate: (target: NavSection) => void;
   onResetArchive: () => void;
 }
 
-export function Footer({ onNavigate, onResetArchive }: FooterProps) {
+export function Footer({ isOwner, ownerLogin, onNavigate, onResetArchive }: FooterProps) {
   const [confirmReset, setConfirmReset] = useState(false);
 
   return (
@@ -62,13 +64,15 @@ export function Footer({ onNavigate, onResetArchive }: FooterProps) {
           >
             Forms
           </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('github')}
-            className="hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
-          >
-            GitHub Pages
-          </button>
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => onNavigate('github')}
+              className="hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
+            >
+              GitHub Pages
+            </button>
+          )}
           <a
             href="https://github.com/theartofnoting/dhamma_content"
             target="_blank"
@@ -79,34 +83,46 @@ export function Footer({ onNavigate, onResetArchive }: FooterProps) {
             <ExternalLink className="h-3 w-3" aria-hidden="true" />
           </a>
 
-          {!confirmReset ? (
-            <button
-              type="button"
-              onClick={() => setConfirmReset(true)}
-              className="hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
-            >
-              Restore Defaults
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onResetArchive();
-                  setConfirmReset(false);
-                }}
-                className="text-[#9A3412] dark:text-[#FCA5A5] font-medium underline cursor-pointer"
-              >
-                Confirm Reset
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmReset(false)}
-                className="hover:text-[#1C1917] cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
+          <button
+            type="button"
+            onClick={() => onNavigate('login')}
+            className="hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer font-medium"
+          >
+            {isOwner ? `Owner: @${ownerLogin || 'theartofnoting'}` : 'Owner Login'}
+          </button>
+
+          {isOwner && (
+            <>
+              {!confirmReset ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmReset(true)}
+                  className="hover:text-[#9A3412] dark:hover:text-[#FCA5A5] cursor-pointer"
+                >
+                  Restore Defaults
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onResetArchive();
+                      setConfirmReset(false);
+                    }}
+                    className="text-[#9A3412] dark:text-[#FCA5A5] font-medium underline cursor-pointer"
+                  >
+                    Confirm Reset
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmReset(false)}
+                    className="hover:text-[#1C1917] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

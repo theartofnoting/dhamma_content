@@ -10,6 +10,7 @@ import {
   TraditionCollection,
 } from '../types/dhamma';
 import { calculateEstimatedReadingMinutes } from '../utils/storageAndExport';
+import { getCollectionSlug, getDiscourseSlug, getSayadawSlug, slugifySegment } from '../utils/urlRouter';
 import { DiscourseMediaBlock } from './DiscourseMediaBlock';
 
 interface StoreTeachingModalProps {
@@ -133,7 +134,11 @@ export function StoreTeachingModal({
   const [pullQuote, setPullQuote] = useState('');
   const [marginTerm, setMarginTerm] = useState('');
   const [marginNoteText, setMarginNoteText] = useState('');
+  const [discourseSlug, setDiscourseSlug] = useState('');
+  const [collectionSlug, setCollectionSlug] = useState('');
+  const [sourceFormat, setSourceFormat] = useState<'md' | 'rst'>('md');
   const [repoPath, setRepoPath] = useState('');
+  const [repoPathTouched, setRepoPathTouched] = useState(false);
 
   // Media fields
   const [coverImage, setCoverImage] = useState('');
@@ -182,7 +187,11 @@ export function StoreTeachingModal({
       setPullQuote(editingDiscourse.pullQuote);
       setMarginTerm(editingDiscourse.marginNotes[0]?.termPali || '');
       setMarginNoteText(editingDiscourse.marginNotes[0]?.noteText || '');
+      setDiscourseSlug(getDiscourseSlug(editingDiscourse));
+      setCollectionSlug(getCollectionSlug(editingDiscourse));
+      setSourceFormat(editingDiscourse.sourceFormat || (editingDiscourse.repoPath.endsWith('.rst') ? 'rst' : 'md'));
       setRepoPath(editingDiscourse.repoPath);
+      setRepoPathTouched(true);
       setCoverImage(editingDiscourse.coverImage || '');
       setCoverCaption(editingDiscourse.coverCaption || '');
       setAudioReferenceUrl(editingDiscourse.audioReferenceUrl || '');
@@ -209,7 +218,11 @@ export function StoreTeachingModal({
       setPullQuote('');
       setMarginTerm('');
       setMarginNoteText('');
+      setDiscourseSlug('');
+      setCollectionSlug('satipatthana-vipassana');
+      setSourceFormat('md');
       setRepoPath('');
+      setRepoPathTouched(false);
       setCoverImage('');
       setCoverCaption('');
       setAudioReferenceUrl('');
@@ -220,6 +233,28 @@ export function StoreTeachingModal({
     setNewMediaUrl('');
     setNewMediaCaption('');
   }, [isOpen, editingDiscourse, presetSayadawId, sayadaws]);
+
+  useEffect(() => {
+    if (!isOpen || repoPathTouched) return;
+    const sSlug =
+      sayadawSelection === 'custom'
+        ? slugifySegment(customSayadawName || 'sayadaw')
+        : getSayadawSlug(sayadawSelection, sayadaws);
+    const cSlug = slugifySegment(collectionSlug || collection);
+    const dSlug = slugifySegment(discourseSlug || title || 'new-discourse');
+    setRepoPath(`articles/${cSlug}/${sSlug}/${dSlug}.${sourceFormat}`);
+  }, [
+    isOpen,
+    repoPathTouched,
+    sayadawSelection,
+    customSayadawName,
+    collectionSlug,
+    collection,
+    discourseSlug,
+    title,
+    sourceFormat,
+    sayadaws,
+  ]);
 
   if (!isOpen) return null;
 
@@ -347,8 +382,14 @@ export function StoreTeachingModal({
     }
 
     const sections = parseContentToSections(bodyContent, paliExcerpt, paliTranslation);
-    const slug = slugify(title || 'new-discourse');
-    const computedRepoPath = repoPath.trim() || `docs/sayadaw/${resolvedSayadawId}/${slug}.md`;
+    const sSlug =
+      sayadawSelection === 'custom'
+        ? slugify(resolvedSayadawName)
+        : getSayadawSlug(resolvedSayadawId, sayadaws, resolvedSayadawName);
+    const cSlug = slugifySegment(collectionSlug || collection);
+    const dSlug = slugifySegment(discourseSlug || title || 'new-discourse');
+    const computedRepoPath =
+      repoPath.trim() || `articles/${cSlug}/${sSlug}/${dSlug}.${sourceFormat}`;
 
     const nextNumber = String(existingCount + 1).padStart(2, '0');
     const prefix =
@@ -363,10 +404,13 @@ export function StoreTeachingModal({
               : 'MNK';
 
     const draft: DhammaDiscourse = {
-      id: editingDiscourse ? editingDiscourse.id : `${slug}-${Date.now()}`,
+      id: editingDiscourse ? editingDiscourse.id : `${dSlug}-${Date.now()}`,
       accessionCode: editingDiscourse
         ? editingDiscourse.accessionCode
         : `ACC. ${prefix}.${nextNumber}`,
+      slug: dSlug,
+      collectionSlug: cSlug,
+      sourceFormat,
       title: title.trim() || 'Untitled Discourse',
       chineseTitle: chineseTitle.trim() || undefined,
       paliSubtitle: paliSubtitle.trim() || undefined,
@@ -401,7 +445,7 @@ export function StoreTeachingModal({
       footnotes: editingDiscourse?.footnotes || [
         {
           index: 1,
-          text: 'Stored in Vipassana Bhavana (Dhamma Page) and ready to commit to theartofnoting/dhamma_content.',
+          text: 'Stored in Vipassana Bhavana (Dhamma Page) and committed to theartofnoting/dhamma_content.',
         },
       ],
       coverImage: coverImage.trim() || undefined,
@@ -646,13 +690,56 @@ export function StoreTeachingModal({
 
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                Target Markdown Path (for GitHub)
+                URL Discourse Slug
+              </label>
+              <input
+                type="text"
+                value={discourseSlug}
+                onChange={(e) => setDiscourseSlug(e.target.value)}
+                placeholder="e.g., pt05-02-stopping-and-contemplation"
+                className="w-full min-h-[42px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                URL Collection Folder Slug
+              </label>
+              <input
+                type="text"
+                value={collectionSlug}
+                onChange={(e) => setCollectionSlug(e.target.value)}
+                placeholder="e.g., dhamma-talks-by-mogok-sayadaw"
+                className="w-full min-h-[42px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                Source Format
+              </label>
+              <select
+                value={sourceFormat}
+                onChange={(e) => setSourceFormat(e.target.value as 'md' | 'rst')}
+                className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+              >
+                <option value="md">Markdown (.md)</option>
+                <option value="rst">reStructuredText (.rst)</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                Target Source Path (GitHub)
               </label>
               <input
                 type="text"
                 value={repoPath}
-                onChange={(e) => setRepoPath(e.target.value)}
-                placeholder="docs/sayadaw/sayadaw-name/discourse-slug.md"
+                onChange={(e) => {
+                  setRepoPathTouched(true);
+                  setRepoPath(e.target.value);
+                }}
+                placeholder="articles/collection/sayadaw-name/discourse-slug.md"
                 className="w-full min-h-[42px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
               />
             </div>

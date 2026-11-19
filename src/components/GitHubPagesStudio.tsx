@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { Check, Copy, Download, ExternalLink, FileText, Folder, RefreshCw } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  Download,
+  ExternalLink,
+  FileText,
+  Folder,
+  RefreshCw,
+  UploadCloud,
+} from 'lucide-react';
 import {
   DhammaDiscourse,
   GitHubContentEntry,
@@ -17,6 +26,12 @@ interface GitHubPagesStudioProps {
   discourses: DhammaDiscourse[];
   tips: MeditationTip[];
   events: GroupEvent[];
+  hasUnpublishedChanges: boolean;
+  isPublishing: boolean;
+  publishStatus: string | null;
+  publishError: string | null;
+  lastActionsUrl: string | null;
+  onPublishToGitHub: () => void;
   onExportMarkdown: (discourse: DhammaDiscourse) => void;
 }
 
@@ -34,6 +49,12 @@ export function GitHubPagesStudio({
   discourses,
   tips,
   events,
+  hasUnpublishedChanges,
+  isPublishing,
+  publishStatus,
+  publishError,
+  lastActionsUrl,
+  onPublishToGitHub,
   onExportMarkdown,
 }: GitHubPagesStudioProps) {
   const [repoSlug, setRepoSlug] = useState(DEFAULT_REPO_SLUG);
@@ -129,6 +150,65 @@ export function GitHubPagesStudio({
             </a>
             .
           </p>
+        </div>
+
+        {/* Direct Browser-to-GitHub Publisher Card */}
+        <div className="mt-8 p-6 border border-[#D6CEBE] dark:border-[#342E28] bg-[#FBF9F5] dark:bg-[#181512] flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-1.5 max-w-2xl">
+            <p className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74]">
+              Direct Browser Commit · @{repoSlug}
+            </p>
+            <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+              Publish Browser Edits to GitHub Pages
+            </h3>
+            <p className="text-xs leading-relaxed text-[#57534E] dark:text-[#A8A29E]">
+              Commits <span className="font-mono-code">public/data/dhamma-content.json</span>, your
+              authored <span className="font-mono-code">articles/.../*.md</span> or{' '}
+              <span className="font-mono-code">.rst</span> files, and uploaded media under{' '}
+              <span className="font-mono-code">public/media/</span> directly to{' '}
+              <span className="font-mono-code">{repoSlug}</span> so GitHub Actions rebuilds Pages
+              automatically.
+            </p>
+            {publishStatus && (
+              <p className="font-mono-code text-xs text-[#14532D] dark:text-[#86EFAC] pt-1">
+                {publishStatus}
+              </p>
+            )}
+            {lastActionsUrl && (
+              <p className="text-xs pt-1">
+                <a
+                  href={lastActionsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[#9A3412] dark:text-[#FDBA74] underline"
+                >
+                  <span>Monitor GitHub Actions Deployment</span>
+                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                </a>
+              </p>
+            )}
+            {publishError && (
+              <p role="alert" className="text-xs text-[#9A3412] dark:text-[#FCA5A5] pt-1">
+                {publishError}
+              </p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={onPublishToGitHub}
+            disabled={isPublishing}
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-2.5 text-sm font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+          >
+            <UploadCloud className="h-4 w-4" aria-hidden="true" />
+            <span>
+              {isPublishing
+                ? 'Committing to GitHub...'
+                : hasUnpublishedChanges
+                  ? 'Publish Changes Now'
+                  : 'Sync Archive to GitHub'}
+            </span>
+          </button>
         </div>
 
         {/* 2-Column Studio Split */}

@@ -16,6 +16,7 @@ import { eventToIcs, triggerFileDownload } from '../utils/storageAndExport';
 interface EventsCalendarSectionProps {
   events: GroupEvent[];
   formTabs: GoogleFormTab[];
+  isOwner: boolean;
   onSaveEvent: (event: GroupEvent, isEdit: boolean) => void;
   onDeleteEvent: (id: string) => void;
   onRegisterWithForm: (formTabId: string) => void;
@@ -61,6 +62,7 @@ function formatDateRange(start: string, end: string): string {
 export function EventsCalendarSection({
   events,
   formTabs,
+  isOwner,
   onSaveEvent,
   onDeleteEvent,
   onRegisterWithForm,
@@ -262,14 +264,16 @@ export function EventsCalendarSection({
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="inline-flex items-center gap-2 min-h-[42px] px-4 py-2 text-xs font-medium bg-[#1C1917] text-[#FBF9F5] hover:bg-[#9A3412] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#FDBA74] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              <span>Add Course / Event</span>
-            </button>
+            {isOwner && (
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="inline-flex items-center gap-2 min-h-[42px] px-4 py-2 text-xs font-medium bg-[#1C1917] text-[#FBF9F5] hover:bg-[#9A3412] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#FDBA74] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                <span>Add Course / Event</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -423,13 +427,15 @@ export function EventsCalendarSection({
                   Show All Dates
                 </button>
               )}
-              <button
-                type="button"
-                onClick={openCreateModal}
-                className="min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] cursor-pointer"
-              >
-                Add Course / Event
-              </button>
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={openCreateModal}
+                  className="min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] cursor-pointer"
+                >
+                  Add Course / Event
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -482,47 +488,49 @@ export function EventsCalendarSection({
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-[#78716C] dark:text-[#A8A29E]">
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(evt)}
-                      className="inline-flex items-center gap-1 hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
-                    >
-                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                      <span>Edit</span>
-                    </button>
-
-                    {confirmDeleteId !== evt.id ? (
+                  {isOwner && (
+                    <div className="flex items-center gap-3 text-xs text-[#78716C] dark:text-[#A8A29E]">
                       <button
                         type="button"
-                        onClick={() => setConfirmDeleteId(evt.id)}
-                        className="inline-flex items-center gap-1 hover:text-[#9A3412] dark:hover:text-[#FCA5A5] cursor-pointer"
+                        onClick={() => openEditModal(evt)}
+                        className="inline-flex items-center gap-1 hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
                       >
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>Delete</span>
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span>Edit</span>
                       </button>
-                    ) : (
-                      <span className="inline-flex items-center gap-2">
+
+                      {confirmDeleteId !== evt.id ? (
                         <button
                           type="button"
-                          onClick={() => {
-                            onDeleteEvent(evt.id);
-                            setConfirmDeleteId(null);
-                          }}
-                          className="text-[#9A3412] dark:text-[#FCA5A5] font-medium underline cursor-pointer"
+                          onClick={() => setConfirmDeleteId(evt.id)}
+                          className="inline-flex items-center gap-1 hover:text-[#9A3412] dark:hover:text-[#FCA5A5] cursor-pointer"
                         >
-                          Confirm
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>Delete</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(null)}
-                          className="cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </span>
-                    )}
-                  </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onDeleteEvent(evt.id);
+                              setConfirmDeleteId(null);
+                            }}
+                            className="text-[#9A3412] dark:text-[#FCA5A5] font-medium underline cursor-pointer"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </article>
             ))}
@@ -531,7 +539,7 @@ export function EventsCalendarSection({
       </div>
 
       {/* In-app Course / Event Editor Modal */}
-      {isModalOpen && (
+      {isOwner && isModalOpen && (
         <div
           role="dialog"
           aria-modal="true"
