@@ -12,6 +12,7 @@ import {
 import { DhammaDiscourse, ReaderPreferences } from '../types/dhamma';
 import { calculateEstimatedReadingMinutes } from '../utils/storageAndExport';
 import { ArchivalImage } from './ArchivalImage';
+import { DiscourseMediaBlock } from './DiscourseMediaBlock';
 
 interface ReadingRoomProps {
   discourse: DhammaDiscourse;
@@ -21,6 +22,7 @@ interface ReadingRoomProps {
   onUpdatePrefs: (prefs: ReaderPreferences) => void;
   onBackToCatalog: () => void;
   onSelectDiscourse: (id: string) => void;
+  onFilterBySayadaw: (sayadawId: string) => void;
   onToggleBookmark: (id: string) => void;
   onExportMarkdown: (discourse: DhammaDiscourse) => void;
   onEditDiscourse: (discourse: DhammaDiscourse) => void;
@@ -35,6 +37,7 @@ export function ReadingRoom({
   onUpdatePrefs,
   onBackToCatalog,
   onSelectDiscourse,
+  onFilterBySayadaw,
   onToggleBookmark,
   onExportMarkdown,
   onEditDiscourse,
@@ -83,6 +86,9 @@ export function ReadingRoom({
     currentIdx >= 0 && currentIdx < allDiscourses.length - 1
       ? allDiscourses[currentIdx + 1]
       : allDiscourses[0];
+  const sameSayadawDiscourses = allDiscourses.filter(
+    (d) => d.sayadawId === discourse.sayadawId && d.id !== discourse.id,
+  );
 
   return (
     <article ref={articleRef} className="relative">
@@ -184,16 +190,17 @@ export function ReadingRoom({
               <span>Export .md</span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => onEditDiscourse(discourse)}
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Edit Content &amp; Media</span>
+            </button>
+
             {discourse.isUserCreated && (
               <>
-                <button
-                  type="button"
-                  onClick={() => onEditDiscourse(discourse)}
-                  className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
-                >
-                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Edit</span>
-                </button>
                 {!confirmDelete ? (
                   <button
                     type="button"
@@ -254,9 +261,14 @@ export function ReadingRoom({
           )}
 
           <div className="pt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[#44403C] dark:text-[#D6D3D1]">
-            <span className="font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+            <button
+              type="button"
+              onClick={() => onFilterBySayadaw(discourse.sayadawId)}
+              title={`Index all discourses by ${discourse.sayadawName}`}
+              className="font-semibold text-[#1C1917] dark:text-[#F5F5F4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer"
+            >
               {discourse.sayadawName}
-            </span>
+            </button>
             <span aria-hidden="true" className="text-[#A8A29E]">
               ·
             </span>
@@ -275,7 +287,7 @@ export function ReadingRoom({
               <ArchivalImage
                 src={discourse.coverImage}
                 alt={discourse.title}
-                caption={`Archival Plate — ${discourse.sourceText}`}
+                caption={discourse.coverCaption || `Archival Plate — ${discourse.sourceText}`}
                 aspectClassName="aspect-[16/10]"
               />
             )}
@@ -284,6 +296,13 @@ export function ReadingRoom({
             <p className="text-lg leading-relaxed text-[#44403C] dark:text-[#D6D3D1] italic">
               {discourse.summary}
             </p>
+
+            {/* Attached Media, Audio Talks, Video Embeds, Documents */}
+            <DiscourseMediaBlock
+              audioReferenceUrl={discourse.audioReferenceUrl}
+              mediaItems={discourse.mediaItems}
+              discourseTitle={discourse.title}
+            />
 
             {/* Sections */}
             {discourse.sections.map((section, sIdx) => (
@@ -434,6 +453,37 @@ export function ReadingRoom({
                 className="w-full min-h-[40px] px-4 py-2 text-xs font-medium border border-[#1C1917] dark:border-[#E7E5E4] text-[#1C1917] dark:text-[#F5F5F4] hover:bg-[#1C1917] hover:text-[#FBF9F5] dark:hover:bg-[#F5F5F4] dark:hover:text-[#1C1917] transition-colors cursor-pointer"
               >
                 Download Discourse (.md)
+              </button>
+            </div>
+
+            {/* Indexed Under Sayadaw */}
+            <div className="p-5 border border-[#E5DFD3] dark:border-[#342E28] bg-[#F4EFE6]/45 dark:bg-[#1E1A16] space-y-3">
+              <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
+                Sayadaw Index
+              </p>
+              <p className="font-display text-lg font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+                {discourse.sayadawName}
+              </p>
+              {sameSayadawDiscourses.length > 0 && (
+                <div className="space-y-2 pt-1 border-t border-[#E5DFD3] dark:border-[#342E28]">
+                  {sameSayadawDiscourses.map((other) => (
+                    <button
+                      key={other.id}
+                      type="button"
+                      onClick={() => onSelectDiscourse(other.id)}
+                      className="block text-left text-xs leading-relaxed text-[#44403C] dark:text-[#D6D3D1] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
+                    >
+                      {other.accessionCode} · {other.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => onFilterBySayadaw(discourse.sayadawId)}
+                className="text-xs font-medium text-[#9A3412] dark:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer"
+              >
+                View all discourses by this Sayadaw →
               </button>
             </div>
 

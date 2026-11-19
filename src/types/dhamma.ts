@@ -45,6 +45,16 @@ export interface DiscourseFootnote {
   text: string;
 }
 
+export type DiscourseMediaType = 'image' | 'audio' | 'video' | 'document';
+
+export interface DiscourseMediaItem {
+  id: string;
+  type: DiscourseMediaType;
+  title: string;
+  url: string;
+  caption?: string;
+}
+
 export interface DhammaDiscourse {
   id: string;
   accessionCode: string;
@@ -64,6 +74,8 @@ export interface DhammaDiscourse {
   marginNotes: MarginNote[];
   footnotes: DiscourseFootnote[];
   audioReferenceUrl?: string;
+  coverCaption?: string;
+  mediaItems?: DiscourseMediaItem[];
   repoPath: string;
   featuredRank?: 'lead' | 'secondary';
   coverImage?: string;

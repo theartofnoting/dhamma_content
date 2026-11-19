@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BookOpen } from 'lucide-react';
+import { resolveAssetUrl } from '../utils/storageAndExport';
 
 interface ArchivalImageProps {
   src?: string;
@@ -17,15 +18,20 @@ export function ArchivalImage({
   aspectClassName = 'aspect-[4/3]',
 }: ArchivalImageProps) {
   const [hasError, setHasError] = useState(false);
+  const resolvedSrc = src ? resolveAssetUrl(src) : undefined;
+
+  useEffect(() => {
+    setHasError(false);
+  }, [resolvedSrc]);
 
   return (
     <figure className={`flex flex-col ${className}`}>
       <div
         className={`relative overflow-hidden bg-[#EFEAE0] dark:bg-[#231F1B] border border-[#E5DFD3] dark:border-[#342E28] ${aspectClassName}`}
       >
-        {src && !hasError ? (
+        {resolvedSrc && !hasError ? (
           <img
-            src={src}
+            src={resolvedSrc}
             alt={alt}
             referrerPolicy="no-referrer"
             onError={() => setHasError(true)}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { INITIAL_DISCOURSES, SAYADAW_PROFILES } from './data/dhammaSeed';
 import {
   INITIAL_FORM_TABS,
@@ -13,19 +13,23 @@ import {
   MeditationTip,
   NavSection,
   ReaderPreferences,
+  SayadawProfile,
   TraditionCollection,
 } from './types/dhamma';
 import {
+  buildIndexedSayadaws,
   clearAllStoredArchive,
   discourseToMarkdown,
   loadBookmarks,
   loadReaderPrefs,
+  loadStoredCustomSayadaws,
   loadStoredDiscourses,
   loadStoredEvents,
   loadStoredFormTabs,
   loadStoredTips,
   saveBookmarks,
   saveReaderPrefs,
+  saveStoredCustomSayadaws,
   saveStoredDiscourses,
   saveStoredEvents,
   saveStoredFormTabs,
@@ -47,6 +51,9 @@ import { Footer } from './components/Footer';
 export default function App() {
   const [discourses, setDiscourses] = useState<DhammaDiscourse[]>(() =>
     loadStoredDiscourses(INITIAL_DISCOURSES),
+  );
+  const [customSayadaws, setCustomSayadaws] = useState<SayadawProfile[]>(() =>
+    loadStoredCustomSayadaws(),
   );
   const [tips, setTips] = useState<MeditationTip[]>(() =>
     loadStoredTips(INITIAL_MEDITATION_TIPS),
@@ -80,6 +87,7 @@ export default function App() {
   // Store / Edit Discourse Modal
   const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
   const [editingDiscourse, setEditingDiscourse] = useState<DhammaDiscourse | null>(null);
+  const [presetSayadawId, setPresetSayadawId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -94,6 +102,15 @@ export default function App() {
   useEffect(() => {
     saveStoredDiscourses(discourses);
   }, [discourses]);
+
+  useEffect(() => {
+    saveStoredCustomSayadaws(customSayadaws);
+  }, [customSayadaws]);
+
+  const indexedSayadaws = useMemo(
+    () => buildIndexedSayadaws(SAYADAW_PROFILES, customSayadaws, discourses),
+    [customSayadaws, discourses],
+  );
 
   useEffect(() => {
     saveStoredTips(tips);
@@ -168,7 +185,16 @@ export default function App() {
     }, 30);
   };
 
-  const handleSaveTeaching = (discourse: DhammaDiscourse, isEdit: boolean) => {
+  const handleSaveTeaching = (
+    discourse: DhammaDiscourse,
+    isEdit: boolean,
+    newSayadaw?: SayadawProfile,
+  ) => {
+    if (newSayadaw) {
+      setCustomSayadaws((prev) =>
+        prev.some((s) => s.id === newSayadaw.id) ? prev : [...prev, newSayadaw],
+      );
+    }
     if (isEdit) {
       setDiscourses((prev) => prev.map((d) => (d.id === discourse.id ? discourse : d)));
     } else {
@@ -176,6 +202,7 @@ export default function App() {
     }
     setIsStoreModalOpen(false);
     setEditingDiscourse(null);
+    setPresetSayadawId(undefined);
     setActiveDiscourseId(discourse.id);
     setViewMode('reader');
     setActiveNav('reader');
@@ -242,6 +269,7 @@ export default function App() {
   const handleResetArchive = () => {
     clearAllStoredArchive();
     setDiscourses(INITIAL_DISCOURSES);
+    setCustomSayadaws([]);
     setTips(INITIAL_MEDITATION_TIPS);
     setEvents(INITIAL_GROUP_EVENTS);
     setFormTabs(INITIAL_FORM_TABS);
@@ -261,6 +289,7 @@ export default function App() {
         onNavigate={handleNavigate}
         onOpenStoreModal={() => {
           setEditingDiscourse(null);
+          setPresetSayadawId(selectedSayadawId !== 'All' ? selectedSayadawId : undefined);
           setIsStoreModalOpen(true);
         }}
       />
@@ -275,10 +304,12 @@ export default function App() {
             onUpdatePrefs={setPrefs}
             onBackToCatalog={() => handleNavigate('discourses')}
             onSelectDiscourse={handleSelectDiscourse}
+            onFilterBySayadaw={handleFilterBySayadaw}
             onToggleBookmark={handleToggleBookmark}
             onExportMarkdown={handleExportMarkdown}
             onEditDiscourse={(d) => {
               setEditingDiscourse(d);
+              setPresetSayadawId(undefined);
               setIsStoreModalOpen(true);
             }}
             onDeleteDiscourse={handleDeleteDiscourse}
@@ -296,7 +327,7 @@ export default function App() {
 
             <DiscourseCatalog
               discourses={discourses}
-              sayadaws={SAYADAW_PROFILES}
+              sayadaws={indexedSayadaws}
               bookmarks={bookmarks}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
@@ -313,14 +344,20 @@ export default function App() {
               onSelectDiscourse={handleSelectDiscourse}
               onToggleBookmark={handleToggleBookmark}
               onExportMarkdown={handleExportMarkdown}
-              onOpenStoreModal={() => {
+              onEditDiscourse={(d) => {
+                setEditingDiscourse(d);
+                setPresetSayadawId(undefined);
+                setIsStoreModalOpen(true);
+              }}
+              onOpenStoreModal={(presetId) => {
                 setEditingDiscourse(null);
+                setPresetSayadawId(presetId);
                 setIsStoreModalOpen(true);
               }}
             />
 
             <SayadawDirectory
-              sayadaws={SAYADAW_PROFILES}
+              sayadaws={indexedSayadaws}
               discourses={discourses}
               onFilterBySayadaw={handleFilterBySayadaw}
             />
@@ -362,11 +399,13 @@ export default function App() {
       <StoreTeachingModal
         isOpen={isStoreModalOpen}
         editingDiscourse={editingDiscourse}
-        sayadaws={SAYADAW_PROFILES}
+        presetSayadawId={presetSayadawId}
+        sayadaws={indexedSayadaws}
         existingCount={discourses.length}
         onClose={() => {
           setIsStoreModalOpen(false);
           setEditingDiscourse(null);
+          setPresetSayadawId(undefined);
         }}
         onSave={handleSaveTeaching}
       />

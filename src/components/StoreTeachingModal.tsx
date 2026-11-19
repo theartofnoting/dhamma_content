@@ -1,20 +1,29 @@
-import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Copy, Check, FilePlus, Image as ImageIcon, Plus, Trash2, Upload, X } from 'lucide-react';
 import {
   DhammaDiscourse,
   DiscourseLanguage,
+  DiscourseMediaItem,
+  DiscourseMediaType,
   DiscourseSection,
   SayadawProfile,
   TraditionCollection,
 } from '../types/dhamma';
+import { calculateEstimatedReadingMinutes } from '../utils/storageAndExport';
+import { DiscourseMediaBlock } from './DiscourseMediaBlock';
 
 interface StoreTeachingModalProps {
   isOpen: boolean;
   editingDiscourse: DhammaDiscourse | null;
+  presetSayadawId?: string;
   sayadaws: SayadawProfile[];
   existingCount: number;
   onClose: () => void;
-  onSave: (discourse: DhammaDiscourse, isEdit: boolean) => void;
+  onSave: (
+    discourse: DhammaDiscourse,
+    isEdit: boolean,
+    newSayadaw?: SayadawProfile,
+  ) => void;
 }
 
 const COLLECTIONS: TraditionCollection[] = [
@@ -74,7 +83,7 @@ function parseContentToSections(
       paragraphs:
         currentParagraphs.length > 0
           ? currentParagraphs
-          : ['Recorded for open Dhamma study in the Nanda Dhamma Archive.'],
+          : ['Recorded for open Dhamma study in Vipassana Bhavana.'],
     });
   }
 
@@ -101,6 +110,7 @@ function sectionsToRawBody(sections: DiscourseSection[]): string {
 export function StoreTeachingModal({
   isOpen,
   editingDiscourse,
+  presetSayadawId,
   sayadaws,
   existingCount,
   onClose,
@@ -111,7 +121,8 @@ export function StoreTeachingModal({
   const [paliSubtitle, setPaliSubtitle] = useState('');
   const [sayadawSelection, setSayadawSelection] = useState(sayadaws[0]?.id || 'custom');
   const [customSayadawName, setCustomSayadawName] = useState('');
-  const [collection, setCollection] = useState<TraditionCollection>('Abhidhamma');
+  const [customSayadawMonastery, setCustomSayadawMonastery] = useState('');
+  const [collection, setCollection] = useState<TraditionCollection>('Satipatthana & Vipassana');
   const [language, setLanguage] = useState<DiscourseLanguage>('Pāli · 繁體中文 · English');
   const [sourceText, setSourceText] = useState('');
   const [dateRecorded, setDateRecorded] = useState('');
@@ -123,11 +134,30 @@ export function StoreTeachingModal({
   const [marginTerm, setMarginTerm] = useState('');
   const [marginNoteText, setMarginNoteText] = useState('');
   const [repoPath, setRepoPath] = useState('');
+
+  // Media fields
+  const [coverImage, setCoverImage] = useState('');
+  const [coverCaption, setCoverCaption] = useState('');
+  const [audioReferenceUrl, setAudioReferenceUrl] = useState('');
+  const [mediaItems, setMediaItems] = useState<DiscourseMediaItem[]>([]);
+  const [newMediaType, setNewMediaType] = useState<DiscourseMediaType>('audio');
+  const [newMediaTitle, setNewMediaTitle] = useState('');
+  const [newMediaUrl, setNewMediaUrl] = useState('');
+  const [newMediaCaption, setNewMediaCaption] = useState('');
+  const [showMediaPreview, setShowMediaPreview] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
+  const [copiedSeed, setCopiedSeed] = useState(false);
+
   const [validationError, setValidationError] = useState<string | null>(null);
+  const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     setValidationError(null);
+    setUploadNotice(null);
+    setShowMediaPreview(false);
+    setCopiedSeed(false);
+
     if (editingDiscourse) {
       setTitle(editingDiscourse.title);
       setChineseTitle(editingDiscourse.chineseTitle || '');
@@ -140,6 +170,7 @@ export function StoreTeachingModal({
         setSayadawSelection('custom');
         setCustomSayadawName(editingDiscourse.sayadawName);
       }
+      setCustomSayadawMonastery('');
       setCollection(editingDiscourse.collection);
       setLanguage(editingDiscourse.language);
       setSourceText(editingDiscourse.sourceText);
@@ -152,13 +183,22 @@ export function StoreTeachingModal({
       setMarginTerm(editingDiscourse.marginNotes[0]?.termPali || '');
       setMarginNoteText(editingDiscourse.marginNotes[0]?.noteText || '');
       setRepoPath(editingDiscourse.repoPath);
+      setCoverImage(editingDiscourse.coverImage || '');
+      setCoverCaption(editingDiscourse.coverCaption || '');
+      setAudioReferenceUrl(editingDiscourse.audioReferenceUrl || '');
+      setMediaItems(editingDiscourse.mediaItems || []);
     } else {
       setTitle('');
       setChineseTitle('');
       setPaliSubtitle('');
-      setSayadawSelection(sayadaws[0]?.id || 'custom');
+      const initialSayadaw =
+        presetSayadawId && sayadaws.some((s) => s.id === presetSayadawId)
+          ? presetSayadawId
+          : sayadaws[0]?.id || 'custom';
+      setSayadawSelection(initialSayadaw);
       setCustomSayadawName('');
-      setCollection('Abhidhamma');
+      setCustomSayadawMonastery('');
+      setCollection('Satipatthana & Vipassana');
       setLanguage('Pāli · 繁體中文 · English');
       setSourceText('');
       setDateRecorded(`${new Date().getFullYear()} · Archive Entry`);
@@ -170,39 +210,145 @@ export function StoreTeachingModal({
       setMarginTerm('');
       setMarginNoteText('');
       setRepoPath('');
+      setCoverImage('');
+      setCoverCaption('');
+      setAudioReferenceUrl('');
+      setMediaItems([]);
     }
-  }, [isOpen, editingDiscourse, sayadaws]);
+    setNewMediaType('audio');
+    setNewMediaTitle('');
+    setNewMediaUrl('');
+    setNewMediaCaption('');
+  }, [isOpen, editingDiscourse, presetSayadawId, sayadaws]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) {
-      setValidationError('Please enter a discourse title.');
+  const insertSectionTemplate = () => {
+    const snippet = `\n\n## New Section Title\n\nWrite the Sayadaw's exposition or transcript paragraphs here.\n`;
+    const textarea = bodyTextareaRef.current;
+    if (!textarea) {
+      setBodyContent((prev) => `${prev}${snippet}`.trimStart());
       return;
     }
-    if (!bodyContent.trim()) {
-      setValidationError('Please enter the Sayadaw teaching content to store.');
-      return;
-    }
+    const start = textarea.selectionStart ?? bodyContent.length;
+    const end = textarea.selectionEnd ?? bodyContent.length;
+    const next = `${bodyContent.slice(0, start)}${snippet}${bodyContent.slice(end)}`;
+    setBodyContent(next);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const cursor = start + snippet.length;
+      textarea.setSelectionRange(cursor, cursor);
+    });
+  };
 
+  const handleCoverImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 1_500_000) {
+      setUploadNotice(
+        `Selected file "${file.name}" is ${(file.size / 1_000_000).toFixed(1)} MB. For GitHub Pages, place large files in public/media/${file.name} and enter "media/${file.name}" in the URL field so browser storage stays fast.`,
+      );
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setCoverImage(reader.result);
+        setUploadNotice(`Attached "${file.name}" for immediate preview and local archive save.`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAttachmentFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 1_500_000) {
+      setUploadNotice(
+        `"${file.name}" is ${(file.size / 1_000_000).toFixed(1)} MB. Commit large MP3/MP4/PDF files under public/media/${file.name} in GitHub and enter "media/${file.name}" below.`,
+      );
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        const inferredType: DiscourseMediaType = file.type.startsWith('audio/')
+          ? 'audio'
+          : file.type.startsWith('video/')
+            ? 'video'
+            : file.type.startsWith('image/')
+              ? 'image'
+              : 'document';
+        setMediaItems((prev) => [
+          ...prev,
+          {
+            id: `media-${Date.now()}`,
+            type: inferredType,
+            title: file.name.replace(/\.[^.]+$/, ''),
+            url: reader.result as string,
+          },
+        ]);
+        setUploadNotice(`Attached "${file.name}" to this discourse.`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddMediaItem = () => {
+    if (!newMediaUrl.trim()) {
+      setValidationError('Enter a media URL or repo path (e.g., https://youtu.be/... or media/talk.mp3) before clicking Add Attachment.');
+      return;
+    }
+    setValidationError(null);
+    setMediaItems((prev) => [
+      ...prev,
+      {
+        id: `media-${Date.now()}-${prev.length}`,
+        type: newMediaType,
+        title: newMediaTitle.trim() || `${newMediaType.toUpperCase()} Attachment ${prev.length + 1}`,
+        url: newMediaUrl.trim(),
+        caption: newMediaCaption.trim() || undefined,
+      },
+    ]);
+    setNewMediaTitle('');
+    setNewMediaUrl('');
+    setNewMediaCaption('');
+  };
+
+  const handleRemoveMediaItem = (id: string) => {
+    setMediaItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const buildDiscoursePayload = (): {
+    discourse: DhammaDiscourse;
+    newSayadaw?: SayadawProfile;
+  } => {
     const chosenSayadaw = sayadaws.find((s) => s.id === sayadawSelection);
     const resolvedSayadawName =
       sayadawSelection === 'custom'
         ? customSayadawName.trim() || 'Sayadaw (Archive Contributor)'
         : chosenSayadaw?.name || 'Ven. Dr. Nandamālābhivaṃsa';
     const resolvedSayadawId =
-      sayadawSelection === 'custom'
-        ? slugify(resolvedSayadawName)
-        : sayadawSelection;
+      sayadawSelection === 'custom' ? slugify(resolvedSayadawName) : sayadawSelection;
+
+    let newSayadaw: SayadawProfile | undefined;
+    if (sayadawSelection === 'custom' && !sayadaws.some((s) => s.id === resolvedSayadawId)) {
+      newSayadaw = {
+        id: resolvedSayadawId,
+        name: resolvedSayadawName,
+        honorificTitle: 'Group & Lineage Sayadaw',
+        monastery: customSayadawMonastery.trim() || 'Vipassana Bhavana Study Group',
+        location: 'Archive Contributor Lineage',
+        lineage: collection,
+        years: 'Contemporary',
+        biography: `Discourses and study recordings indexed under ${resolvedSayadawName}.`,
+        primaryTexts: sourceText.trim() ? [sourceText.trim()] : [],
+      };
+    }
 
     const sections = parseContentToSections(bodyContent, paliExcerpt, paliTranslation);
-    const wordCount = bodyContent.trim().split(/\s+/).length;
-    const readingMinutes = Math.max(3, Math.round(wordCount / 180));
-
-    const slug = slugify(title);
-    const computedRepoPath =
-      repoPath.trim() || `docs/sayadaw/${resolvedSayadawId}/${slug}.md`;
+    const slug = slugify(title || 'new-discourse');
+    const computedRepoPath = repoPath.trim() || `docs/sayadaw/${resolvedSayadawId}/${slug}.md`;
 
     const nextNumber = String(existingCount + 1).padStart(2, '0');
     const prefix =
@@ -216,12 +362,12 @@ export function StoreTeachingModal({
               ? 'VIS'
               : 'MNK';
 
-    const discourse: DhammaDiscourse = {
+    const draft: DhammaDiscourse = {
       id: editingDiscourse ? editingDiscourse.id : `${slug}-${Date.now()}`,
       accessionCode: editingDiscourse
         ? editingDiscourse.accessionCode
         : `ACC. ${prefix}.${nextNumber}`,
-      title: title.trim(),
+      title: title.trim() || 'Untitled Discourse',
       chineseTitle: chineseTitle.trim() || undefined,
       paliSubtitle: paliSubtitle.trim() || undefined,
       sayadawId: resolvedSayadawId,
@@ -229,12 +375,13 @@ export function StoreTeachingModal({
       collection,
       language,
       dateRecorded: dateRecorded.trim() || `${new Date().getFullYear()} · Archive Entry`,
-      readingMinutes,
+      readingMinutes: 5,
       sourceText: sourceText.trim() || 'Recorded Sayadaw Desanā',
       summary:
         summary.trim() ||
         bodyContent.trim().split('\n').find((l) => l.trim() && !l.startsWith('## '))?.slice(0, 220) ||
-        title.trim(),
+        title.trim() ||
+        'Sayadaw Dhamma discourse.',
       sections,
       pullQuote:
         pullQuote.trim() ||
@@ -254,15 +401,57 @@ export function StoreTeachingModal({
       footnotes: editingDiscourse?.footnotes || [
         {
           index: 1,
-          text: 'Stored locally in Vipassana Bhavana (Dhamma Page) and ready to commit as Markdown to theartofnoting/dhamma_content.',
+          text: 'Stored in Vipassana Bhavana (Dhamma Page) and ready to commit to theartofnoting/dhamma_content.',
         },
       ],
+      coverImage: coverImage.trim() || undefined,
+      coverCaption: coverCaption.trim() || undefined,
+      audioReferenceUrl: audioReferenceUrl.trim() || undefined,
+      mediaItems: mediaItems.length > 0 ? mediaItems : undefined,
       repoPath: computedRepoPath,
-      isUserCreated: true,
+      featuredRank: editingDiscourse?.featuredRank,
+      isUserCreated: editingDiscourse ? editingDiscourse.isUserCreated : true,
     };
 
-    onSave(discourse, Boolean(editingDiscourse));
+    draft.readingMinutes = calculateEstimatedReadingMinutes(draft);
+    return { discourse: draft, newSayadaw };
   };
+
+  const handleCopyTypeScriptSeed = async () => {
+    const { discourse } = buildDiscoursePayload();
+    const snippet = `${JSON.stringify(discourse, null, 2)},`;
+    try {
+      await navigator.clipboard.writeText(snippet);
+      setCopiedSeed(true);
+      setTimeout(() => setCopiedSeed(false), 2000);
+    } catch {
+      // Ignore clipboard permission errors
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) {
+      setValidationError('Please enter a discourse title.');
+      return;
+    }
+    if (sayadawSelection === 'custom' && !customSayadawName.trim()) {
+      setValidationError('Please enter the new Sayadaw name to index this discourse.');
+      return;
+    }
+    if (!bodyContent.trim()) {
+      setValidationError('Please enter the Sayadaw writing content to store.');
+      return;
+    }
+
+    const { discourse, newSayadaw } = buildDiscoursePayload();
+    onSave(discourse, Boolean(editingDiscourse), newSayadaw);
+  };
+
+  const liveWordCount = bodyContent.trim()
+    ? bodyContent.trim().split(/\s+/).filter(Boolean).length
+    : 0;
+  const liveEstMinutes = Math.max(2, Math.round(liveWordCount / 125));
 
   return (
     <div
@@ -271,17 +460,17 @@ export function StoreTeachingModal({
       aria-labelledby="store-teaching-heading"
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#1C1917]/60 backdrop-blur-[2px] p-4"
     >
-      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[#FBF9F5] dark:bg-[#181512] border border-[#D6CEBE] dark:border-[#342E28] p-6 sm:p-8 shadow-xl">
+      <div className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-[#FBF9F5] dark:bg-[#181512] border border-[#D6CEBE] dark:border-[#342E28] p-6 sm:p-8 shadow-xl">
         <div className="flex items-start justify-between gap-4 pb-5 border-b border-[#E5DFD3] dark:border-[#342E28]">
           <div className="space-y-1">
             <p className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74]">
-              theartofnoting/dhamma_content · Archive Entry
+              theartofnoting/dhamma_content · Discourse Writing &amp; Media Editor
             </p>
             <h2
               id="store-teaching-heading"
               className="font-display text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]"
             >
-              {editingDiscourse ? 'Edit Stored Sayadaw Teaching' : 'Store Sayadaw Dhamma Teaching'}
+              {editingDiscourse ? 'Edit Discourse Content & Media' : 'Add Sayadaw Discourse & Media'}
             </h2>
           </div>
 
@@ -295,7 +484,7 @@ export function StoreTeachingModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="pt-6 space-y-5">
+        <form onSubmit={handleSubmit} className="pt-6 space-y-6">
           {validationError && (
             <div
               role="alert"
@@ -305,6 +494,7 @@ export function StoreTeachingModal({
             </div>
           )}
 
+          {/* 1. Core Metadata & Sayadaw Index */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2 space-y-1.5">
               <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
@@ -319,6 +509,71 @@ export function StoreTeachingModal({
                 className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
               />
             </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                Index Under Sayadaw *
+              </label>
+              <select
+                value={sayadawSelection}
+                onChange={(e) => setSayadawSelection(e.target.value)}
+                className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+              >
+                {sayadaws.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+                <option value="custom">+ Add New Sayadaw to Index</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                Collection
+              </label>
+              <select
+                value={collection}
+                onChange={(e) => setCollection(e.target.value as TraditionCollection)}
+                className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+              >
+                {COLLECTIONS.map((col) => (
+                  <option key={col} value={col}>
+                    {col}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {sayadawSelection === 'custom' && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                    New Sayadaw Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={customSayadawName}
+                    onChange={(e) => setCustomSayadawName(e.target.value)}
+                    placeholder="e.g., Ven. Sayadaw U Pandita"
+                    className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                    Sayadaw Monastery / Center (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={customSayadawMonastery}
+                    onChange={(e) => setCustomSayadawMonastery(e.target.value)}
+                    placeholder="e.g., Panditarama Meditation Center"
+                    className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                  />
+                </div>
+              </>
+            )}
 
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
@@ -344,56 +599,6 @@ export function StoreTeachingModal({
                 placeholder="e.g., Vedanānupassanā-satipaṭṭhāna"
                 className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
               />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                Sayadaw Master
-              </label>
-              <select
-                value={sayadawSelection}
-                onChange={(e) => setSayadawSelection(e.target.value)}
-                className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-              >
-                {sayadaws.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-                <option value="custom">Other Sayadaw (Enter Name)</option>
-              </select>
-            </div>
-
-            {sayadawSelection === 'custom' && (
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                  Custom Sayadaw Name
-                </label>
-                <input
-                  type="text"
-                  value={customSayadawName}
-                  onChange={(e) => setCustomSayadawName(e.target.value)}
-                  placeholder="e.g., Ven. Sayadaw U Pandita"
-                  className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                />
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                Collection
-              </label>
-              <select
-                value={collection}
-                onChange={(e) => setCollection(e.target.value as TraditionCollection)}
-                className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-              >
-                {COLLECTIONS.map((col) => (
-                  <option key={col} value={col}>
-                    {col}
-                  </option>
-                ))}
-              </select>
             </div>
 
             <div className="space-y-1.5">
@@ -434,12 +639,28 @@ export function StoreTeachingModal({
                 type="text"
                 value={dateRecorded}
                 onChange={(e) => setDateRecorded(e.target.value)}
-                placeholder="e.g., 2018 · Sagaing Hills"
+                placeholder="e.g., 2026 · Retreat Hall"
                 className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
               />
             </div>
 
-            <div className="sm:col-span-2 space-y-1.5">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                Target Markdown Path (for GitHub)
+              </label>
+              <input
+                type="text"
+                value={repoPath}
+                onChange={(e) => setRepoPath(e.target.value)}
+                placeholder="docs/sayadaw/sayadaw-name/discourse-slug.md"
+                className="w-full min-h-[42px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+              />
+            </div>
+          </div>
+
+          {/* 2. Writing Content */}
+          <div className="pt-4 border-t border-[#E5DFD3] dark:border-[#342E28] space-y-4">
+            <div className="space-y-1.5">
               <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
                 Summary / Editorial Abstract
               </label>
@@ -447,118 +668,346 @@ export function StoreTeachingModal({
                 rows={2}
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                placeholder="Brief overview of the core Dhamma teaching..."
+                placeholder="Brief overview of the core Dhamma teaching shown in the catalog..."
                 className="w-full px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
               />
             </div>
 
-            <div className="sm:col-span-2 space-y-1.5">
-              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                Full Discourse Text * (Prefix section titles with "## ")
-              </label>
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                  Full Discourse Writing * (Start sections with <span className="font-mono-code">## Heading</span>)
+                </label>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono-code text-[11px] text-[#78716C] dark:text-[#A8A29E] tabular-nums">
+                    {liveWordCount} words · ~{liveEstMinutes} min read
+                  </span>
+                  <button
+                    type="button"
+                    onClick={insertSectionTemplate}
+                    className="inline-flex items-center gap-1 min-h-[30px] px-2.5 text-[11px] font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer"
+                  >
+                    <FilePlus className="h-3 w-3" aria-hidden="true" />
+                    <span>+ Insert Section</span>
+                  </button>
+                </div>
+              </div>
               <textarea
-                rows={6}
+                ref={bodyTextareaRef}
+                rows={7}
                 required
                 value={bodyContent}
                 onChange={(e) => setBodyContent(e.target.value)}
-                placeholder={`## 1. Direct Observation\n\nEnter Sayadaw's discourse paragraphs here...\n\n## 2. Applying Insight in Daily Life\n\nSecond section paragraphs...`}
+                placeholder={`## 1. Direct Observation\n\nEnter the Sayadaw's discourse paragraphs here...\n\n## 2. Applying Insight in Daily Life\n\nSecond section paragraphs...`}
                 className="w-full px-3 py-2 text-sm leading-relaxed bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                Pāli Excerpt (Optional)
-              </label>
-              <input
-                type="text"
-                value={paliExcerpt}
-                onChange={(e) => setPaliExcerpt(e.target.value)}
-                placeholder="e.g., Sukhaṃ vā vedanaṃ vedayamāno..."
-                className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-              />
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                  Pāli Excerpt (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={paliExcerpt}
+                  onChange={(e) => setPaliExcerpt(e.target.value)}
+                  placeholder="e.g., Sukhaṃ vā vedanaṃ vedayamāno..."
+                  className="w-full min-h-[40px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                />
+              </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                Pāli Translation (Optional)
-              </label>
-              <input
-                type="text"
-                value={paliTranslation}
-                onChange={(e) => setPaliTranslation(e.target.value)}
-                placeholder="English or Chinese translation of excerpt..."
-                className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-              />
-            </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                  Pāli Translation (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={paliTranslation}
+                  onChange={(e) => setPaliTranslation(e.target.value)}
+                  placeholder="English or Chinese translation of excerpt..."
+                  className="w-full min-h-[40px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                />
+              </div>
 
-            <div className="sm:col-span-2 space-y-1.5">
-              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                Pull Quote (Optional)
-              </label>
-              <input
-                type="text"
-                value={pullQuote}
-                onChange={(e) => setPullQuote(e.target.value)}
-                placeholder="Key contemplative insight highlighted in the Reading Room..."
-                className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-              />
-            </div>
+              <div className="sm:col-span-2 space-y-1.5">
+                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                  Pull Quote (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={pullQuote}
+                  onChange={(e) => setPullQuote(e.target.value)}
+                  placeholder="Key contemplative insight highlighted in the Reading Room..."
+                  className="w-full min-h-[40px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                />
+              </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                Margin Glossary Term (Optional)
-              </label>
-              <input
-                type="text"
-                value={marginTerm}
-                onChange={(e) => setMarginTerm(e.target.value)}
-                placeholder="e.g., Vedanā-paccayā taṇhā"
-                className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-              />
-            </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                  Margin Glossary Term (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={marginTerm}
+                  onChange={(e) => setMarginTerm(e.target.value)}
+                  placeholder="e.g., Vedanā-paccayā taṇhā"
+                  className="w-full min-h-[40px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                />
+              </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                Margin Note Explanation (Optional)
-              </label>
-              <input
-                type="text"
-                value={marginNoteText}
-                onChange={(e) => setMarginNoteText(e.target.value)}
-                placeholder="Concise scholarly note for the margin rail..."
-                className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-              />
-            </div>
-
-            <div className="sm:col-span-2 space-y-1.5">
-              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                Target Repository Path (for theartofnoting/dhamma_content export)
-              </label>
-              <input
-                type="text"
-                value={repoPath}
-                onChange={(e) => setRepoPath(e.target.value)}
-                placeholder="docs/sayadaw/nandamalabhivamsa/new-teaching.md"
-                className="w-full min-h-[42px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-              />
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                  Margin Note Explanation (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={marginNoteText}
+                  onChange={(e) => setMarginNoteText(e.target.value)}
+                  placeholder="Concise note shown in the Reading Room rail..."
+                  className="w-full min-h-[40px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="pt-4 border-t border-[#E5DFD3] dark:border-[#342E28] flex flex-wrap items-center justify-end gap-3">
+          {/* 3. Media: Cover Image, Audio/Video Talk, Additional Attachments */}
+          <div className="pt-4 border-t border-[#E5DFD3] dark:border-[#342E28] space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+                  Media &amp; Recordings
+                </h3>
+                <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                  Paste a YouTube link, MP3/MP4 URL, image URL, upload a file, or reference files
+                  stored in <span className="font-mono-code">public/media/</span>.
+                </p>
+              </div>
+              {(audioReferenceUrl.trim() || mediaItems.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => setShowMediaPreview((v) => !v)}
+                  className="min-h-[34px] px-3 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer"
+                >
+                  {showMediaPreview ? 'Hide Media Preview' : 'Preview Media'}
+                </button>
+              )}
+            </div>
+
+            {uploadNotice && (
+              <div className="p-3 border border-[#D6CEBE] dark:border-[#342E28] bg-[#F4EFE6]/70 dark:bg-[#221E1A] text-xs text-[#44403C] dark:text-[#D6D3D1]">
+                {uploadNotice}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                  Cover Image URL or Repo Path
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={coverImage}
+                    onChange={(e) => setCoverImage(e.target.value)}
+                    placeholder="https://... or media/retreat-hall.jpg"
+                    className="flex-1 min-h-[40px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                  />
+                  <label className="inline-flex items-center gap-1.5 min-h-[40px] px-3 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer shrink-0">
+                    <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Upload</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCoverImageUpload}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                  Cover Image Caption (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={coverCaption}
+                  onChange={(e) => setCoverCaption(e.target.value)}
+                  placeholder="e.g., Sagaing Dhamma Hall · 2026 Retreat"
+                  className="w-full min-h-[40px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                />
+              </div>
+
+              <div className="sm:col-span-2 space-y-1.5">
+                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                  Primary Audio / Video Talk URL (YouTube, MP3, MP4, or <span className="font-mono-code">media/talk.mp3</span>)
+                </label>
+                <input
+                  type="text"
+                  value={audioReferenceUrl}
+                  onChange={(e) => setAudioReferenceUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=... or https://.../talk.mp3"
+                  className="w-full min-h-[40px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                />
+              </div>
+            </div>
+
+            {/* Additional Media Items Builder */}
+            <div className="p-4 border border-[#E5DFD3] dark:border-[#342E28] bg-[#F4EFE6]/35 dark:bg-[#1E1A16] space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                  Additional Media Attachments ({mediaItems.length})
+                </p>
+                <label className="inline-flex items-center gap-1.5 min-h-[34px] px-3 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer">
+                  <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Upload File (Image/Audio)</span>
+                  <input
+                    type="file"
+                    accept="image/*,audio/*,video/*,.pdf"
+                    onChange={handleAttachmentFileUpload}
+                    className="sr-only"
+                  />
+                </label>
+              </div>
+
+              {mediaItems.length > 0 && (
+                <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28] border-t border-b border-[#E5DFD3] dark:border-[#342E28]">
+                  {mediaItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="py-2 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-[#1C1917] dark:text-[#F5F5F4] truncate">
+                          <span className="font-mono-code uppercase text-[10px] text-[#9A3412] dark:text-[#FDBA74] mr-2">
+                            [{item.type}]
+                          </span>
+                          {item.title}
+                        </p>
+                        <p className="font-mono-code text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
+                          {item.url.startsWith('data:') ? 'Uploaded embedded file' : item.url}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMediaItem(item.id)}
+                        aria-label={`Remove ${item.title}`}
+                        className="p-1.5 text-[#9A3412] dark:text-[#FCA5A5] hover:opacity-80 cursor-pointer shrink-0"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                <div className="sm:col-span-3 space-y-1">
+                  <label className="block text-[11px] text-[#57534E] dark:text-[#A8A29E]">
+                    Type
+                  </label>
+                  <select
+                    value={newMediaType}
+                    onChange={(e) => setNewMediaType(e.target.value as DiscourseMediaType)}
+                    className="w-full min-h-[38px] px-2.5 text-xs bg-[#FBF9F5] dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832]"
+                  >
+                    <option value="audio">Audio (MP3/M4A)</option>
+                    <option value="video">Video / YouTube</option>
+                    <option value="image">Image / Diagram</option>
+                    <option value="document">PDF / Handout</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-4 space-y-1">
+                  <label className="block text-[11px] text-[#57534E] dark:text-[#A8A29E]">
+                    Label
+                  </label>
+                  <input
+                    type="text"
+                    value={newMediaTitle}
+                    onChange={(e) => setNewMediaTitle(e.target.value)}
+                    placeholder="e.g., Part 1 Audio Recording"
+                    className="w-full min-h-[38px] px-2.5 text-xs bg-[#FBF9F5] dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832]"
+                  />
+                </div>
+                <div className="sm:col-span-5 space-y-1">
+                  <label className="block text-[11px] text-[#57534E] dark:text-[#A8A29E]">
+                    Media URL or <span className="font-mono-code">media/...</span> Path
+                  </label>
+                  <input
+                    type="text"
+                    value={newMediaUrl}
+                    onChange={(e) => setNewMediaUrl(e.target.value)}
+                    placeholder="https://... or media/notes.pdf"
+                    className="w-full min-h-[38px] px-2.5 font-mono-code text-xs bg-[#FBF9F5] dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832]"
+                  />
+                </div>
+                <div className="sm:col-span-9 space-y-1">
+                  <input
+                    type="text"
+                    value={newMediaCaption}
+                    onChange={(e) => setNewMediaCaption(e.target.value)}
+                    placeholder="Optional caption or duration note..."
+                    className="w-full min-h-[36px] px-2.5 text-xs bg-[#FBF9F5] dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832]"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <button
+                    type="button"
+                    onClick={handleAddMediaItem}
+                    className="w-full inline-flex items-center justify-center gap-1 min-h-[36px] px-3 text-xs font-medium border border-[#1C1917] dark:border-[#E7E5E4] text-[#1C1917] dark:text-[#F5F5F4] hover:bg-[#1C1917] hover:text-[#FBF9F5] dark:hover:bg-[#F5F5F4] dark:hover:text-[#1C1917] cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Add Media</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {showMediaPreview && (
+              <DiscourseMediaBlock
+                audioReferenceUrl={audioReferenceUrl}
+                mediaItems={mediaItems}
+                discourseTitle={title || 'Discourse Preview'}
+              />
+            )}
+          </div>
+
+          <div className="pt-4 border-t border-[#E5DFD3] dark:border-[#342E28] flex flex-wrap items-center justify-between gap-3">
             <button
               type="button"
-              onClick={onClose}
-              className="min-h-[44px] px-5 py-2 text-sm font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#1C1917] cursor-pointer"
+              onClick={handleCopyTypeScriptSeed}
+              className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412] cursor-pointer"
+              title="Copy formatted JSON/TypeScript entry to paste into src/data/dhammaSeed.ts for all visitors"
             >
-              Cancel
+              {copiedSeed ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-[#14532D] dark:text-[#86EFAC]" />
+                  <span>Copied Entry for dhammaSeed.ts</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>Copy Entry for dhammaSeed.ts</span>
+                </>
+              )}
             </button>
-            <button
-              type="submit"
-              className="min-h-[44px] px-6 py-2 text-sm font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] cursor-pointer"
-            >
-              {editingDiscourse ? 'Update Teaching' : 'Save to Archive'}
-            </button>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="min-h-[44px] px-5 py-2 text-sm font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#1C1917] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="min-h-[44px] px-6 py-2 text-sm font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] cursor-pointer"
+              >
+                {editingDiscourse ? 'Update Discourse' : 'Save to Archive'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

@@ -1,5 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Bookmark, Clock, Download, Moon, Search, Sun, X } from 'lucide-react';
+import {
+  Bookmark,
+  Clock,
+  Download,
+  Headphones,
+  Layers,
+  Moon,
+  Pencil,
+  Plus,
+  Search,
+  Sun,
+  X,
+} from 'lucide-react';
 import {
   DhammaDiscourse,
   DiscourseLanguage,
@@ -28,7 +40,8 @@ interface DiscourseCatalogProps {
   onSelectDiscourse: (id: string) => void;
   onToggleBookmark: (id: string) => void;
   onExportMarkdown: (discourse: DhammaDiscourse) => void;
-  onOpenStoreModal: () => void;
+  onEditDiscourse: (discourse: DhammaDiscourse) => void;
+  onOpenStoreModal: (presetSayadawId?: string) => void;
 }
 
 const COLLECTIONS: (TraditionCollection | 'All')[] = [
@@ -67,9 +80,19 @@ export function DiscourseCatalog({
   onSelectDiscourse,
   onToggleBookmark,
   onExportMarkdown,
+  onEditDiscourse,
   onOpenStoreModal,
 }: DiscourseCatalogProps) {
   const [sortByTime, setSortByTime] = useState<'default' | 'shortest' | 'longest'>('default');
+  const [groupBySayadaw, setGroupBySayadaw] = useState(false);
+
+  const countBySayadaw = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const d of discourses) {
+      counts.set(d.sayadawId, (counts.get(d.sayadawId) ?? 0) + 1);
+    }
+    return counts;
+  }, [discourses]);
 
   const readingTimesById = useMemo(() => {
     const map = new Map<string, number>();
@@ -133,13 +156,31 @@ export function DiscourseCatalog({
     [filtered, readingTimesById],
   );
 
+  const groupedBySayadaw = useMemo(() => {
+    const groups = new Map<string, { sayadawId: string; sayadawName: string; items: DhammaDiscourse[] }>();
+    for (const d of filtered) {
+      const existing = groups.get(d.sayadawId);
+      if (existing) {
+        existing.items.push(d);
+      } else {
+        groups.set(d.sayadawId, {
+          sayadawId: d.sayadawId,
+          sayadawName: d.sayadawName,
+          items: [d],
+        });
+      }
+    }
+    return Array.from(groups.values());
+  }, [filtered]);
+
   const isDefaultUnfiltered =
     selectedCollection === 'All' &&
     selectedSayadawId === 'All' &&
     selectedLanguage === 'All' &&
     !onlySaved &&
     !searchQuery.trim() &&
-    sortByTime === 'default';
+    sortByTime === 'default' &&
+    !groupBySayadaw;
 
   const leadDiscourse = isDefaultUnfiltered
     ? filtered.find((d) => d.featuredRank === 'lead') || filtered[0]
@@ -155,6 +196,7 @@ export function DiscourseCatalog({
     onSayadawChange('All');
     onLanguageChange('All');
     setSortByTime('default');
+    setGroupBySayadaw(false);
     if (onlySaved) onToggleOnlySaved();
   };
 
@@ -172,6 +214,17 @@ export function DiscourseCatalog({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() =>
+              onOpenStoreModal(selectedSayadawId !== 'All' ? selectedSayadawId : undefined)
+            }
+            className="inline-flex items-center gap-1.5 min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Add Discourse</span>
+          </button>
+
           <button
             type="button"
             onClick={onToggleOnlySaved}
@@ -276,6 +329,68 @@ export function DiscourseCatalog({
               <option value="shortest">Shortest Study First</option>
               <option value="longest">Longest Study First</option>
             </select>
+
+            <button
+              type="button"
+              onClick={() => setGroupBySayadaw((prev) => !prev)}
+              aria-pressed={groupBySayadaw}
+              className={`inline-flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 text-xs font-medium border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                groupBySayadaw
+                  ? 'border-[#9A3412] bg-[#9A3412] text-[#FBF9F5] dark:border-[#B45309] dark:bg-[#B45309]'
+                  : 'border-[#D6CEBE] dark:border-[#3F3832] bg-[#FBF9F5] dark:bg-[#221E1A] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412]'
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Group by Sayadaw</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Index by Sayadaw Bar */}
+        <div className="space-y-2">
+          <p className="text-[11px] tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
+            Index by Sayadaw
+          </p>
+          <div
+            role="tablist"
+            aria-label="Index discourses by Sayadaw"
+            className="flex items-center gap-1.5 overflow-x-auto pb-1"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedSayadawId === 'All'}
+              onClick={() => onSayadawChange('All')}
+              className={`min-h-[36px] px-3 py-1.5 text-xs font-medium transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer border ${
+                selectedSayadawId === 'All'
+                  ? 'border-[#9A3412] bg-[#9A3412] text-[#FBF9F5] dark:border-[#B45309] dark:bg-[#B45309]'
+                  : 'border-[#E5DFD3] dark:border-[#342E28] bg-[#FBF9F5] dark:bg-[#221E1A] text-[#57534E] dark:text-[#A8A29E] hover:border-[#9A3412] hover:text-[#1C1917] dark:hover:text-[#F5F5F4]'
+              }`}
+            >
+              <span className="tabular-nums">All Sayadaws ({discourses.length})</span>
+            </button>
+            {sayadaws.map((s) => {
+              const active = selectedSayadawId === s.id;
+              const cnt = countBySayadaw.get(s.id) ?? 0;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => onSayadawChange(s.id)}
+                  className={`min-h-[36px] px-3 py-1.5 text-xs font-medium transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer border ${
+                    active
+                      ? 'border-[#9A3412] bg-[#9A3412] text-[#FBF9F5] dark:border-[#B45309] dark:bg-[#B45309]'
+                      : 'border-[#E5DFD3] dark:border-[#342E28] bg-[#FBF9F5] dark:bg-[#221E1A] text-[#57534E] dark:text-[#A8A29E] hover:border-[#9A3412] hover:text-[#1C1917] dark:hover:text-[#F5F5F4]'
+                  }`}
+                >
+                  <span className="tabular-nums">
+                    {s.name} ({cnt})
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -327,7 +442,9 @@ export function DiscourseCatalog({
             </button>
             <button
               type="button"
-              onClick={onOpenStoreModal}
+              onClick={() =>
+                onOpenStoreModal(selectedSayadawId !== 'All' ? selectedSayadawId : undefined)
+              }
               className="min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] cursor-pointer"
             >
               Store New Teaching
@@ -383,7 +500,13 @@ export function DiscourseCatalog({
                     )}
 
                     <p className="text-sm font-medium text-[#292524] dark:text-[#E7E5E4]">
-                      {leadDiscourse.sayadawName}
+                      <button
+                        type="button"
+                        onClick={() => onSayadawChange(leadDiscourse.sayadawId)}
+                        className="hover:text-[#9A3412] dark:hover:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer"
+                      >
+                        {leadDiscourse.sayadawName}
+                      </button>
                       <span className="mx-2 text-[#A8A29E]" aria-hidden="true">
                         ·
                       </span>
@@ -477,7 +600,15 @@ export function DiscourseCatalog({
                           )}
 
                           <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                            {d.sayadawName} · {d.sourceText}
+                            <button
+                              type="button"
+                              onClick={() => onSayadawChange(d.sayadawId)}
+                              className="font-medium text-[#292524] dark:text-[#E7E5E4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer"
+                            >
+                              {d.sayadawName}
+                            </button>
+                            <span className="mx-1.5" aria-hidden="true">·</span>
+                            <span>{d.sourceText}</span>
                           </p>
 
                           <p className="text-sm leading-relaxed text-[#44403C] dark:text-[#D6D3D1]">
@@ -518,97 +649,249 @@ export function DiscourseCatalog({
 
           {/* Tier 3: Complete Archive Catalogue Table / Index Rows */}
           <div className="pt-10">
-            <div className="flex items-baseline justify-between pb-4 border-b border-[#1C1917]/20 dark:border-[#E7E5E4]/20">
+            <div className="flex flex-wrap items-baseline justify-between gap-3 pb-4 border-b border-[#1C1917]/20 dark:border-[#E7E5E4]/20">
               <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
-                Complete Archival Catalogue
+                {groupBySayadaw ? 'Catalogue Indexed by Sayadaw' : 'Complete Archival Catalogue'}
               </h3>
               <span className="font-mono-code text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums">
                 {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'} · {totalStudyMinutes} min total study
               </span>
             </div>
 
-            <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28]">
-              {filtered.map((d) => {
-                const isSaved = bookmarks.includes(d.id);
-                const estMinutes = readingTimesById.get(d.id) ?? d.readingMinutes;
-                return (
-                  <div
-                    key={d.id}
-                    className="py-5 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start lg:items-center hover:bg-[#F4EFE6]/50 dark:hover:bg-[#221E1A]/60 transition-colors px-2 -mx-2"
-                  >
-                    <div className="lg:col-span-2 flex items-center gap-3">
-                      <span className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74] tabular-nums">
-                        {d.accessionCode}
-                      </span>
-                      {d.isUserCreated && (
-                        <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                          · Local Entry
+            {groupBySayadaw ? (
+              <div className="space-y-10 pt-6">
+                {groupedBySayadaw.map((group) => (
+                  <div key={group.sayadawId} className="space-y-2">
+                    <div className="flex flex-wrap items-baseline justify-between gap-3 pb-2.5 border-b border-[#D6CEBE] dark:border-[#342E28]">
+                      <div className="flex items-baseline gap-3">
+                        <button
+                          type="button"
+                          onClick={() => onSayadawChange(group.sayadawId)}
+                          className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] transition-colors cursor-pointer"
+                        >
+                          {group.sayadawName}
+                        </button>
+                        <span className="font-mono-code text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums">
+                          {group.items.length} {group.items.length === 1 ? 'discourse' : 'discourses'}
                         </span>
-                      )}
-                    </div>
-
-                    <div className="lg:col-span-5 space-y-1">
-                      <button
-                        type="button"
-                        onClick={() => onSelectDiscourse(d.id)}
-                        className="text-left font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] transition-colors cursor-pointer"
-                      >
-                        {d.title}
-                      </button>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-[#57534E] dark:text-[#A8A29E]">
-                        {d.chineseTitle && <span>{d.chineseTitle}</span>}
-                        {d.chineseTitle && <span aria-hidden="true">·</span>}
-                        <span>{d.sourceText}</span>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => onOpenStoreModal(group.sayadawId)}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-[#9A3412] dark:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer"
+                      >
+                        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span>Add under this Sayadaw</span>
+                      </button>
                     </div>
 
-                    <div className="lg:col-span-3 text-xs text-[#57534E] dark:text-[#A8A29E] space-y-0.5">
-                      <p className="font-medium text-[#292524] dark:text-[#E7E5E4]">
-                        {d.sayadawName}
-                      </p>
-                      <p className="inline-flex items-center gap-1.5">
-                        <span>{d.collection}</span>
-                        <span aria-hidden="true">·</span>
-                        <span className="inline-flex items-center gap-1 tabular-nums text-[#9A3412] dark:text-[#FDBA74]">
-                          <Clock className="h-3 w-3" aria-hidden="true" />
-                          <span>{estMinutes} min read</span>
-                        </span>
-                      </p>
-                    </div>
+                    <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28]">
+                      {group.items.map((d) => {
+                        const isSaved = bookmarks.includes(d.id);
+                        const estMinutes = readingTimesById.get(d.id) ?? d.readingMinutes;
+                        const hasMedia = Boolean(
+                          d.audioReferenceUrl || (d.mediaItems && d.mediaItems.length > 0),
+                        );
+                        return (
+                          <div
+                            key={d.id}
+                            className="py-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start lg:items-center hover:bg-[#F4EFE6]/50 dark:hover:bg-[#221E1A]/60 transition-colors px-2 -mx-2"
+                          >
+                            <div className="lg:col-span-2 flex items-center gap-2">
+                              <span className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74] tabular-nums">
+                                {d.accessionCode}
+                              </span>
+                            </div>
 
-                    <div className="lg:col-span-2 flex items-center lg:justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => onToggleBookmark(d.id)}
-                        aria-label={isSaved ? `Remove ${d.title} from shelf` : `Save ${d.title} to shelf`}
-                        className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
-                      >
-                        <Bookmark
-                          className={`h-4 w-4 ${
-                            isSaved ? 'fill-[#9A3412] text-[#9A3412] dark:fill-[#FDBA74] dark:text-[#FDBA74]' : ''
-                          }`}
-                        />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onExportMarkdown(d)}
-                        aria-label={`Export ${d.title} as Markdown`}
-                        className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
-                      >
-                        <Download className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onSelectDiscourse(d.id)}
-                        className="min-h-[40px] px-3.5 py-1.5 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] hover:text-[#9A3412] dark:hover:border-[#FDBA74] dark:hover:text-[#FDBA74] transition-colors cursor-pointer whitespace-nowrap shrink-0"
-                      >
-                        Read
-                      </button>
+                            <div className="lg:col-span-6 space-y-1">
+                              <button
+                                type="button"
+                                onClick={() => onSelectDiscourse(d.id)}
+                                className="text-left font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] transition-colors cursor-pointer"
+                              >
+                                {d.title}
+                              </button>
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-[#57534E] dark:text-[#A8A29E]">
+                                {d.chineseTitle && <span>{d.chineseTitle}</span>}
+                                {d.chineseTitle && <span aria-hidden="true">·</span>}
+                                <span>{d.sourceText}</span>
+                              </div>
+                            </div>
+
+                            <div className="lg:col-span-2 text-xs text-[#57534E] dark:text-[#A8A29E] space-y-0.5">
+                              <p>{d.collection}</p>
+                              <p className="inline-flex items-center gap-2 tabular-nums text-[#9A3412] dark:text-[#FDBA74]">
+                                <span className="inline-flex items-center gap-1">
+                                  <Clock className="h-3 w-3" aria-hidden="true" />
+                                  <span>{estMinutes} min</span>
+                                </span>
+                                {hasMedia && (
+                                  <span className="inline-flex items-center gap-1 text-[#57534E] dark:text-[#A8A29E]">
+                                    <Headphones className="h-3 w-3" aria-hidden="true" />
+                                    <span>Media</span>
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="lg:col-span-2 flex items-center lg:justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => onEditDiscourse(d)}
+                                aria-label={`Edit ${d.title}`}
+                                className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onToggleBookmark(d.id)}
+                                aria-label={
+                                  isSaved ? `Remove ${d.title} from shelf` : `Save ${d.title} to shelf`
+                                }
+                                className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
+                              >
+                                <Bookmark
+                                  className={`h-4 w-4 ${
+                                    isSaved
+                                      ? 'fill-[#9A3412] text-[#9A3412] dark:fill-[#FDBA74] dark:text-[#FDBA74]'
+                                      : ''
+                                  }`}
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onExportMarkdown(d)}
+                                aria-label={`Export ${d.title} as Markdown`}
+                                className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
+                              >
+                                <Download className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onSelectDiscourse(d.id)}
+                                className="min-h-[40px] px-3.5 py-1.5 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] hover:text-[#9A3412] dark:hover:border-[#FDBA74] dark:hover:text-[#FDBA74] transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                              >
+                                Read
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28]">
+                {filtered.map((d) => {
+                  const isSaved = bookmarks.includes(d.id);
+                  const estMinutes = readingTimesById.get(d.id) ?? d.readingMinutes;
+                  const hasMedia = Boolean(
+                    d.audioReferenceUrl || (d.mediaItems && d.mediaItems.length > 0),
+                  );
+                  return (
+                    <div
+                      key={d.id}
+                      className="py-5 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start lg:items-center hover:bg-[#F4EFE6]/50 dark:hover:bg-[#221E1A]/60 transition-colors px-2 -mx-2"
+                    >
+                      <div className="lg:col-span-2 flex items-center gap-3">
+                        <span className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74] tabular-nums">
+                          {d.accessionCode}
+                        </span>
+                        {d.isUserCreated && (
+                          <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                            · Local Entry
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="lg:col-span-5 space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => onSelectDiscourse(d.id)}
+                          className="text-left font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] transition-colors cursor-pointer"
+                        >
+                          {d.title}
+                        </button>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-[#57534E] dark:text-[#A8A29E]">
+                          {d.chineseTitle && <span>{d.chineseTitle}</span>}
+                          {d.chineseTitle && <span aria-hidden="true">·</span>}
+                          <span>{d.sourceText}</span>
+                        </div>
+                      </div>
+
+                      <div className="lg:col-span-3 text-xs text-[#57534E] dark:text-[#A8A29E] space-y-0.5">
+                        <p>
+                          <button
+                            type="button"
+                            onClick={() => onSayadawChange(d.sayadawId)}
+                            className="font-medium text-[#292524] dark:text-[#E7E5E4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer text-left"
+                          >
+                            {d.sayadawName}
+                          </button>
+                        </p>
+                        <p className="inline-flex flex-wrap items-center gap-1.5">
+                          <span>{d.collection}</span>
+                          <span aria-hidden="true">·</span>
+                          <span className="inline-flex items-center gap-1 tabular-nums text-[#9A3412] dark:text-[#FDBA74]">
+                            <Clock className="h-3 w-3" aria-hidden="true" />
+                            <span>{estMinutes} min read</span>
+                          </span>
+                          {hasMedia && (
+                            <>
+                              <span aria-hidden="true">·</span>
+                              <span className="inline-flex items-center gap-1 text-[#57534E] dark:text-[#A8A29E]">
+                                <Headphones className="h-3 w-3" aria-hidden="true" />
+                                <span>Media</span>
+                              </span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="lg:col-span-2 flex items-center lg:justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onEditDiscourse(d)}
+                          aria-label={`Edit ${d.title}`}
+                          className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onToggleBookmark(d.id)}
+                          aria-label={isSaved ? `Remove ${d.title} from shelf` : `Save ${d.title} to shelf`}
+                          className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
+                        >
+                          <Bookmark
+                            className={`h-4 w-4 ${
+                              isSaved ? 'fill-[#9A3412] text-[#9A3412] dark:fill-[#FDBA74] dark:text-[#FDBA74]' : ''
+                            }`}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onExportMarkdown(d)}
+                          aria-label={`Export ${d.title} as Markdown`}
+                          className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onSelectDiscourse(d.id)}
+                          className="min-h-[40px] px-3.5 py-1.5 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] hover:text-[#9A3412] dark:hover:border-[#FDBA74] dark:hover:text-[#FDBA74] transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                        >
+                          Read
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}

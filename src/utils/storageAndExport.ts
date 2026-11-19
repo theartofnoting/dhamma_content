@@ -1,14 +1,17 @@
 import {
   DhammaDiscourse,
+  DiscourseMediaType,
   GitHubContentEntry,
   GitHubRepoInfo,
   GoogleFormTab,
   GroupEvent,
   MeditationTip,
   ReaderPreferences,
+  SayadawProfile,
 } from '../types/dhamma';
 
 const STORED_DISCOURSES_KEY = 'nanda_dhamma_stored_discourses_v1';
+const STORED_SAYADAWS_KEY = 'vipassana_bhavana_sayadaws_v1';
 const STORED_TIPS_KEY = 'vipassana_bhavana_tips_v1';
 const STORED_EVENTS_KEY = 'vipassana_bhavana_events_v1';
 const STORED_FORMS_KEY = 'vipassana_bhavana_forms_v1';
@@ -95,9 +98,61 @@ export function saveStoredFormTabs(tabs: GoogleFormTab[]): void {
   }
 }
 
+export function loadStoredCustomSayadaws(): SayadawProfile[] {
+  try {
+    const raw = localStorage.getItem(STORED_SAYADAWS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as SayadawProfile[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredCustomSayadaws(sayadaws: SayadawProfile[]): void {
+  try {
+    localStorage.setItem(STORED_SAYADAWS_KEY, JSON.stringify(sayadaws));
+  } catch {
+    // Ignore
+  }
+}
+
+export function buildIndexedSayadaws(
+  seedSayadaws: SayadawProfile[],
+  customSayadaws: SayadawProfile[],
+  discourses: DhammaDiscourse[],
+): SayadawProfile[] {
+  const byId = new Map<string, SayadawProfile>();
+  for (const s of seedSayadaws) {
+    byId.set(s.id, s);
+  }
+  for (const s of customSayadaws) {
+    if (!byId.has(s.id)) {
+      byId.set(s.id, s);
+    }
+  }
+  for (const d of discourses) {
+    if (d.sayadawId && !byId.has(d.sayadawId)) {
+      byId.set(d.sayadawId, {
+        id: d.sayadawId,
+        name: d.sayadawName || d.sayadawId,
+        honorificTitle: 'Group & Archive Contributor Lineage',
+        monastery: 'Vipassana Bhavana Study Group',
+        location: 'Archive Index',
+        lineage: d.collection,
+        years: 'Contemporary',
+        biography: `Teachings and recorded discourses indexed under ${d.sayadawName}.`,
+        primaryTexts: [d.sourceText].filter(Boolean),
+      });
+    }
+  }
+  return Array.from(byId.values());
+}
+
 export function clearAllStoredArchive(): void {
   try {
     localStorage.removeItem(STORED_DISCOURSES_KEY);
+    localStorage.removeItem(STORED_SAYADAWS_KEY);
     localStorage.removeItem(STORED_TIPS_KEY);
     localStorage.removeItem(STORED_EVENTS_KEY);
     localStorage.removeItem(STORED_FORMS_KEY);
@@ -210,6 +265,85 @@ export function normalizeGoogleFormUrl(input: string): {
   return { ok: true, embedUrl: parsed.toString() };
 }
 
+export function resolveAssetUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return '';
+  if (/^(https?:|data:|blob:)/i.test(trimmed)) {
+    return trimmed;
+  }
+  const base = import.meta.env.BASE_URL || '/';
+  if (trimmed.startsWith(base)) {
+    return trimmed;
+  }
+  const cleaned = trimmed.replace(/^\/+/, '').replace(/^public\//i, '');
+  return `${base}${cleaned}`;
+}
+
+export function extractYouTubeId(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl.trim());
+    const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+    if (host === 'youtu.be') {
+      const id = parsed.pathname.split('/').filter(Boolean)[0];
+      return id || null;
+    }
+    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
+      if (parsed.pathname === '/watch') {
+        return parsed.searchParams.get('v');
+      }
+      const match = parsed.pathname.match(/^\/(?:embed|shorts|live)\/([^/?]+)/);
+      if (match && match[1]) return match[1];
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export function resolveMediaSource(
+  rawUrl: string,
+  explicitType?: DiscourseMediaType,
+): {
+  kind: 'youtube' | 'audio' | 'video' | 'image' | 'link';
+  src: string;
+  embedSrc?: string;
+} {
+  const trimmed = rawUrl.trim();
+  const src = resolveAssetUrl(trimmed);
+  const ytId = extractYouTubeId(trimmed);
+  if (ytId) {
+    return {
+      kind: 'youtube',
+      src,
+      embedSrc: `https://www.youtube-nocookie.com/embed/${ytId}`,
+    };
+  }
+
+  const lower = trimmed.toLowerCase().split('?')[0];
+  if (
+    explicitType === 'audio' ||
+    lower.startsWith('data:audio/') ||
+    /\.(mp3|m4a|wav|ogg|aac|opus|flac)$/i.test(lower)
+  ) {
+    return { kind: 'audio', src };
+  }
+  if (
+    explicitType === 'video' ||
+    lower.startsWith('data:video/') ||
+    /\.(mp4|webm|mov|m4v|ogv)$/i.test(lower)
+  ) {
+    return { kind: 'video', src };
+  }
+  if (
+    explicitType === 'image' ||
+    lower.startsWith('data:image/') ||
+    /\.(jpg|jpeg|png|webp|gif|svg|avif)$/i.test(lower)
+  ) {
+    return { kind: 'image', src };
+  }
+  return { kind: 'link', src };
+}
+
 export function eventToIcs(evt: GroupEvent): string {
   const formatIcsDate = (dateStr: string) => dateStr.replace(/-/g, '');
   const start = formatIcsDate(evt.startDate);
@@ -290,6 +424,8 @@ export function discourseToMarkdown(d: DhammaDiscourse): string {
     `language: "${d.language}"`,
     `date_recorded: "${d.dateRecorded}"`,
     `source_text: "${d.sourceText.replace(/"/g, '\\"')}"`,
+    d.coverImage ? `cover_image: "${d.coverImage}"` : null,
+    d.audioReferenceUrl ? `audio_reference: "${d.audioReferenceUrl}"` : null,
     `repo_path: "${d.repoPath}"`,
     `license: "CC BY-NC-SA 4.0 (Dhamma-dāna · Vipassana Bhavana)"`,
     '---',
@@ -306,6 +442,7 @@ export function discourseToMarkdown(d: DhammaDiscourse): string {
     `> **Sayadaw:** ${d.sayadawName}  `,
     `> **Source:** ${d.sourceText}  `,
     `> **Collection:** ${d.collection} · ${d.language}`,
+    d.audioReferenceUrl ? `> **Audio / Media:** ${d.audioReferenceUrl}` : null,
     '',
     d.summary,
     '',
@@ -333,6 +470,19 @@ export function discourseToMarkdown(d: DhammaDiscourse): string {
     })
     .join('\n');
 
+  const mediaSection =
+    d.mediaItems && d.mediaItems.length > 0
+      ? [
+          '## Media & Attachments',
+          '',
+          ...d.mediaItems.map(
+            (m) =>
+              `- **${m.title}** (${m.type}): ${m.url}${m.caption ? ` — *${m.caption}*` : ''}`,
+          ),
+          '',
+        ].join('\n')
+      : '';
+
   const notes =
     d.marginNotes.length > 0
       ? [
@@ -356,7 +506,7 @@ export function discourseToMarkdown(d: DhammaDiscourse): string {
         ].join('\n')
       : '';
 
-  return [frontmatter, header, body, notes, footnotes].join('\n');
+  return [frontmatter, header, body, mediaSection, notes, footnotes].filter(Boolean).join('\n');
 }
 
 export function triggerFileDownload(
