@@ -4,7 +4,6 @@ import {
   Bookmark,
   Clock,
   Download,
-  MessageSquare,
   Moon,
   Pencil,
   Sun,
@@ -26,7 +25,6 @@ interface ReadingRoomProps {
   onExportMarkdown: (discourse: DhammaDiscourse) => void;
   onEditDiscourse: (discourse: DhammaDiscourse) => void;
   onDeleteDiscourse: (id: string) => void;
-  onOpenAssistant: (prompt?: string) => void;
 }
 
 export function ReadingRoom({
@@ -41,7 +39,6 @@ export function ReadingRoom({
   onExportMarkdown,
   onEditDiscourse,
   onDeleteDiscourse,
-  onOpenAssistant,
 }: ReadingRoomProps) {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -185,19 +182,6 @@ export function ReadingRoom({
             >
               <Download className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Export .md</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                onOpenAssistant(
-                  `Please help me reflect on "${discourse.title}" by ${discourse.sayadawName} (${discourse.sourceText}).`,
-                )
-              }
-              className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#9A3412] text-[#9A3412] dark:border-[#FDBA74] dark:text-[#FDBA74] hover:bg-[#9A3412] hover:text-[#FBF9F5] cursor-pointer whitespace-nowrap shrink-0 transition-colors"
-            >
-              <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Ask Study Assistant</span>
             </button>
 
             {discourse.isUserCreated && (

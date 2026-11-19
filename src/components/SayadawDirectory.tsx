@@ -1,18 +1,15 @@
-import { Globe } from 'lucide-react';
 import { DhammaDiscourse, SayadawProfile } from '../types/dhamma';
 
 interface SayadawDirectoryProps {
   sayadaws: SayadawProfile[];
   discourses: DhammaDiscourse[];
   onFilterBySayadaw: (sayadawId: string) => void;
-  onResearchSayadaw: (sayadawName: string) => void;
 }
 
 export function SayadawDirectory({
   sayadaws,
   discourses,
   onFilterBySayadaw,
-  onResearchSayadaw,
 }: SayadawDirectoryProps) {
   return (
     <section
@@ -84,15 +81,6 @@ export function SayadawDirectory({
                       className="min-h-[40px] px-4 py-2 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] hover:text-[#9A3412] dark:hover:border-[#FDBA74] dark:hover:text-[#FDBA74] transition-colors cursor-pointer whitespace-nowrap shrink-0"
                     >
                       <span className="tabular-nums">View {count} Discourses</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => onResearchSayadaw(s.name)}
-                      className="inline-flex items-center gap-1.5 min-h-[40px] px-3 py-2 text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer whitespace-nowrap shrink-0"
-                    >
-                      <Globe className="h-3.5 w-3.5" aria-hidden="true" />
-                      <span>Web Lookup</span>
                     </button>
                   </div>
                 </div>

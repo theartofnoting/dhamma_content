@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { MessageSquare } from 'lucide-react';
 import { INITIAL_DISCOURSES, SAYADAW_PROFILES } from './data/dhammaSeed';
 import {
   INITIAL_FORM_TABS,
@@ -43,7 +42,6 @@ import { FormsEmbedSection } from './components/FormsEmbedSection';
 import { ReadingRoom } from './components/ReadingRoom';
 import { GitHubPagesStudio } from './components/GitHubPagesStudio';
 import { StoreTeachingModal } from './components/StoreTeachingModal';
-import { AssistantRoleId, StudyAssistantDrawer } from './components/StudyAssistantDrawer';
 import { Footer } from './components/Footer';
 
 export default function App() {
@@ -83,15 +81,6 @@ export default function App() {
   const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
   const [editingDiscourse, setEditingDiscourse] = useState<DhammaDiscourse | null>(null);
 
-  // Study Assistant Drawer (Multi-Turn Gemini Chat + Google Search Grounding)
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
-  const [assistantInitialPrompt, setAssistantInitialPrompt] = useState<string | undefined>(
-    undefined,
-  );
-  const [assistantInitialRole, setAssistantInitialRole] = useState<AssistantRoleId | undefined>(
-    undefined,
-  );
-
   useEffect(() => {
     const root = document.documentElement;
     if (prefs.darkMode) {
@@ -124,12 +113,6 @@ export default function App() {
 
   const activeDiscourse =
     discourses.find((d) => d.id === activeDiscourseId) || discourses[0] || INITIAL_DISCOURSES[0];
-
-  const handleOpenAssistant = (prompt?: string, role?: AssistantRoleId) => {
-    setAssistantInitialPrompt(prompt);
-    setAssistantInitialRole(role);
-    setIsAssistantOpen(true);
-  };
 
   const handleNavigate = (target: NavSection) => {
     setActiveNav(target);
@@ -299,7 +282,6 @@ export default function App() {
               setIsStoreModalOpen(true);
             }}
             onDeleteDiscourse={handleDeleteDiscourse}
-            onOpenAssistant={(prompt) => handleOpenAssistant(prompt, 'discourse-guide')}
           />
         ) : (
           <>
@@ -335,19 +317,12 @@ export default function App() {
                 setEditingDiscourse(null);
                 setIsStoreModalOpen(true);
               }}
-              onOpenAssistant={(prompt) => handleOpenAssistant(prompt, 'quick-study')}
             />
 
             <SayadawDirectory
               sayadaws={SAYADAW_PROFILES}
               discourses={discourses}
               onFilterBySayadaw={handleFilterBySayadaw}
-              onResearchSayadaw={(sayadawName) =>
-                handleOpenAssistant(
-                  `Search for background, major Dhamma publications, and teaching lineage of ${sayadawName}.`,
-                  'web-research',
-                )
-              }
             />
 
             <MeditationTipsSection
@@ -383,27 +358,6 @@ export default function App() {
       </main>
 
       <Footer onNavigate={handleNavigate} onResetArchive={handleResetArchive} />
-
-      {/* Quiet floating Study Assistant launch button */}
-      {!isAssistantOpen && (
-        <button
-          type="button"
-          onClick={() => handleOpenAssistant()}
-          aria-label="Open Dhamma Study Assistant"
-          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 min-h-[44px] px-4 py-2.5 text-xs font-medium bg-[#1C1917] text-[#FBF9F5] hover:bg-[#9A3412] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#FDBA74] border border-[#D6CEBE]/30 shadow-lg transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer"
-        >
-          <MessageSquare className="h-4 w-4" aria-hidden="true" />
-          <span>Study Assistant</span>
-        </button>
-      )}
-
-      <StudyAssistantDrawer
-        isOpen={isAssistantOpen}
-        onClose={() => setIsAssistantOpen(false)}
-        discourses={discourses}
-        initialPrompt={assistantInitialPrompt}
-        initialRole={assistantInitialRole}
-      />
 
       <StoreTeachingModal
         isOpen={isStoreModalOpen}

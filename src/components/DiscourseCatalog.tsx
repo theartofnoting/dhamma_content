@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Bookmark, Clock, Download, MessageSquare, Moon, Search, Sun, X } from 'lucide-react';
+import { Bookmark, Clock, Download, Moon, Search, Sun, X } from 'lucide-react';
 import {
   DhammaDiscourse,
   DiscourseLanguage,
@@ -29,7 +29,6 @@ interface DiscourseCatalogProps {
   onToggleBookmark: (id: string) => void;
   onExportMarkdown: (discourse: DhammaDiscourse) => void;
   onOpenStoreModal: () => void;
-  onOpenAssistant: (prompt?: string) => void;
 }
 
 const COLLECTIONS: (TraditionCollection | 'All')[] = [
@@ -69,7 +68,6 @@ export function DiscourseCatalog({
   onToggleBookmark,
   onExportMarkdown,
   onOpenStoreModal,
-  onOpenAssistant,
 }: DiscourseCatalogProps) {
   const [sortByTime, setSortByTime] = useState<'default' | 'shortest' | 'longest'>('default');
 
@@ -174,19 +172,6 @@ export function DiscourseCatalog({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() =>
-              onOpenAssistant(
-                'Help me plan a study session based on the estimated reading times in our discourse catalog.',
-              )
-            }
-            className="inline-flex items-center gap-2 min-h-[40px] px-4 py-2 text-xs font-medium text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#44403C] hover:border-[#9A3412] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            <MessageSquare className="h-3.5 w-3.5 text-[#9A3412] dark:text-[#FDBA74]" aria-hidden="true" />
-            <span>Study Assistant</span>
-          </button>
-
           <button
             type="button"
             onClick={onToggleOnlySaved}
