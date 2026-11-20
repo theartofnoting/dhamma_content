@@ -171,14 +171,10 @@ export function DiscourseCatalog({
       {filtered.length === 0 ? (
         <div className={`py-14 text-center space-y-3 border-t ${THEME_CLASSES.borderHairline}`}>
           <p className={`font-display text-2xl ${THEME_CLASSES.inkPrimary}`}>
-            {discourses.length === 0 ? dict.catalog.emptyArchiveTitle : dict.catalog.emptyTitle}
+            {dict.catalog.emptyTitle}
           </p>
           <p className={`text-sm ${THEME_CLASSES.inkMuted}`}>
-            {isOwner
-              ? dict.catalog.emptyOwnerHint
-              : discourses.length === 0
-                ? dict.catalog.emptyArchiveVisitorHint
-                : dict.catalog.emptyVisitorHint}
+            {isOwner ? dict.catalog.emptyOwnerHint : dict.catalog.emptyVisitorHint}
           </p>
           <div className="pt-2 flex flex-wrap justify-center gap-3">
             {isFiltering && (

@@ -272,10 +272,6 @@ export function ReadingRoom({
               mediaItems={discourse.mediaItems}
               discourseTitle={discourse.title}
               headingLabel={dict.readingRoom.recordingsTitle}
-              openAudioLabel={dict.readingRoom.openAudio}
-              openResourceLabel={dict.readingRoom.openResource}
-              audioUnsupportedLabel={dict.readingRoom.audioUnsupported}
-              videoUnsupportedLabel={dict.readingRoom.videoUnsupported}
             />
 
             <p className={`text-lg leading-relaxed ${THEME_CLASSES.inkBody} font-medium`}>

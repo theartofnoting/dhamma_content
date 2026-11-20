@@ -101,7 +101,7 @@ export function useArchiveState() {
   const [viewMode, setViewMode] = useState<'home' | 'reader' | 'login' | 'not-found'>(() => {
     if (initialParsed.route.kind === 'login') return 'login';
     if (initialParsed.route.kind === 'discourse') return 'reader';
-    // Defer 'not-found' until the published manifest has loaded so deep links do not flash 404.
+    if (initialParsed.route.kind === 'not-found') return 'not-found';
     return 'home';
   });
   const [activeNav, setActiveNav] = useState<NavSection>(() => {
@@ -211,24 +211,13 @@ export function useArchiveState() {
       setTimeout(() => {
         document.getElementById(SECTION_IDS.discourses)?.scrollIntoView({ behavior: 'smooth' });
       }, 60);
-    } else if (parsed.route.kind === 'github') {
-      if (auth.isOwner) {
-        setViewMode('home');
-        setActiveNav('github');
-        setTimeout(() => {
-          document.getElementById(SECTION_IDS.github)?.scrollIntoView({ behavior: 'smooth' });
-        }, 60);
-      } else {
-        setViewMode('login');
-        setActiveNav('login');
-      }
     } else if (parsed.route.kind === 'login') {
       setViewMode('login');
       setActiveNav('login');
     } else if (parsed.route.kind === 'not-found') {
       setViewMode('not-found');
     }
-  }, [manifestLoaded, discourses, indexedSayadaws, auth.isOwner]);
+  }, [manifestLoaded, discourses, indexedSayadaws]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -286,21 +275,11 @@ export function useArchiveState() {
     const dict = getLocaleDictionary(locale);
     document.documentElement.lang = locale;
 
-    const nextTitle =
-      viewMode === 'reader' && activeDiscourse
-        ? `${activeDiscourse.title} — ${activeDiscourse.sayadawName} | Vipassana Bhavana`
-        : dict.meta.pageTitle;
-    const nextDescription =
-      viewMode === 'reader' && activeDiscourse?.summary
-        ? activeDiscourse.summary
-        : dict.meta.pageDescription;
-
-    document.title = nextTitle;
-    document.querySelector('meta[name="description"]')?.setAttribute('content', nextDescription);
-    document.querySelector('meta[property="og:title"]')?.setAttribute('content', nextTitle);
-    document
-      .querySelector('meta[property="og:description"]')
-      ?.setAttribute('content', nextDescription);
+    if (viewMode === 'reader' && activeDiscourse) {
+      document.title = `${activeDiscourse.title} — ${activeDiscourse.sayadawName} | Vipassana Bhavana`;
+    } else {
+      document.title = dict.meta.pageTitle;
+    }
   }, [locale, viewMode, activeDiscourse]);
 
   const markOwnerDraftDirty = useCallback(

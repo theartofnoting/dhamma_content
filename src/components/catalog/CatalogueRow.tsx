@@ -70,7 +70,7 @@ export function CatalogueRow({
               <span aria-hidden="true">·</span>
               <span className={`inline-flex items-center gap-1 ${THEME_CLASSES.accentInk}`}>
                 <Headphones className="h-3 w-3" aria-hidden="true" />
-                <span>{dict.catalog.mediaLabel}</span>
+                <span>Media</span>
               </span>
             </>
           )}

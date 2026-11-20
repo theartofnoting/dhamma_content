@@ -2,7 +2,10 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, Plugin } from 'vite';
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const CONTENT_MIME_TYPES: Record<string, string> = {
   '.json': 'application/json; charset=utf-8',
@@ -24,7 +27,7 @@ const CONTENT_MIME_TYPES: Record<string, string> = {
 };
 
 function unifiedContentPlugin(basePath: string): Plugin {
-  const contentRoot = path.resolve(import.meta.dirname, 'content');
+  const contentRoot = path.resolve(projectRoot, 'content');
   const normalizedBase = basePath.replace(/\/+$/, '');
 
   return {
@@ -65,7 +68,7 @@ function unifiedContentPlugin(basePath: string): Plugin {
     },
     closeBundle(error?: Error) {
       if (error) return;
-      const distDir = path.resolve(import.meta.dirname, 'dist');
+      const distDir = path.resolve(projectRoot, 'dist');
       const distContent = path.resolve(distDir, 'content');
       if (fs.existsSync(distDir) && fs.existsSync(contentRoot)) {
         fs.cpSync(contentRoot, distContent, { recursive: true, force: true });
@@ -136,8 +139,8 @@ export default defineConfig(() => {
         apply: 'build',
         closeBundle(error?: Error): void {
           if (error) return;
-          const distDir = path.resolve(import.meta.dirname, 'dist');
-          const srcAssets = path.resolve(import.meta.dirname, 'src/assets');
+          const distDir = path.resolve(projectRoot, 'dist');
+          const srcAssets = path.resolve(projectRoot, 'src/assets');
           const distAssets = path.resolve(distDir, 'src/assets');
           if (fs.existsSync(distDir) && fs.existsSync(srcAssets)) {
             fs.cpSync(srcAssets, distAssets, { recursive: true, force: true });
@@ -168,7 +171,7 @@ export default defineConfig(() => {
     },
     resolve: {
       alias: {
-        '@': path.resolve(import.meta.dirname, '.'),
+        '@': path.resolve(projectRoot, '.'),
       },
     },
     server: {

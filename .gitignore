@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+.git
+.aistudio
+node_modules
+dist
