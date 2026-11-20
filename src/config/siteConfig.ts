@@ -1,15 +1,17 @@
 import {
-  DiscourseLanguage,
-  EventStatus,
-  EventType,
-  NavSection,
-  TipCategory,
-  TraditionCollection,
-} from '../types/dhamma';
+  COLLECTION_PREFIXES,
+  DEFAULT_LOCALE,
+  DISCOURSE_LANGUAGES,
+  EVENT_STATUSES,
+  EVENT_TYPES,
+  SITE_LOCALES,
+  TIP_CATEGORIES,
+  TRADITION_COLLECTIONS,
+} from './taxonomy';
+import { NavSection, SiteLocale } from '../types/dhamma';
 
 const ENV_OWNER = (import.meta.env.VITE_GITHUB_OWNER as string | undefined)?.trim();
 const ENV_REPO = (import.meta.env.VITE_GITHUB_REPO as string | undefined)?.trim();
-
 const GITHUB_OWNER = ENV_OWNER || 'theartofnoting';
 const GITHUB_REPO_NAME = ENV_REPO || 'dhamma_content';
 const GITHUB_REPO_SLUG = `${GITHUB_OWNER}/${GITHUB_REPO_NAME}`;
@@ -31,33 +33,36 @@ export const GITHUB_CONFIG = {
 
 export const SITE_CONFIG = {
   brandTitle: 'Vipassana Bhavana',
-  pageTitleSuffix: 'Dhamma Page',
-  heroKicker: 'Dhamma Page',
-  heroHeadline: 'Sayadaw Teachings, Meditation Practice & Group Courses',
-  heroDescription:
-    'The living Dhamma repository for our Vipassana Bhavana group. Store and read discourses from our Sayadaw teachers, explore practical meditation tips, follow upcoming retreat courses, and submit registrations online.',
+  defaultLocale: DEFAULT_LOCALE,
   heroImage: `${BASE_URL}src/assets/images/hero_monastery_library_1795114132971.jpg`,
-  heroImageAlt:
-    'Monastic library desk with palm-leaf manuscripts and bound Pāli volumes in warm morning light',
-  heroImageCaption:
-    'Fig. 1 — Palm-leaf manuscripts and bound Tipiṭaka study volumes in morning light.',
   licenseShort: 'CC BY-NC-SA 4.0 (Dhamma-dāna · Vipassana Bhavana)',
-  licenseFooter:
-    'Offered freely under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 for non-commercial practice and study.',
-  icsProdId: '-//Vipassana Bhavana//Dhamma Page//EN',
+  icsProdId: '-//Vipassana Bhavana//Dhamma Page//VI',
   icsDomain: `${GITHUB_OWNER}.github.io`,
   maxUploadBytes: 4_000_000,
   maxPortraitBytes: 2_000_000,
 } as const;
 
+export interface LocaleOption {
+  code: SiteLocale;
+  nativeLabel: string;
+  englishName: string;
+  shortCode: string;
+}
+
+export const LOCALE_OPTIONS: readonly LocaleOption[] = [
+  { code: 'vi', nativeLabel: 'Tiếng Việt', englishName: 'Vietnamese', shortCode: 'VI' },
+  { code: 'en', nativeLabel: 'English', englishName: 'English', shortCode: 'EN' },
+  { code: 'my', nativeLabel: 'မြန်မာဘာသာ', englishName: 'Burmese', shortCode: 'MY' },
+] as const;
+
 export type PrimaryNavId = 'discourses' | 'sayadaws' | 'tips' | 'events' | 'forms';
 
-export const NAV_ITEMS: { id: PrimaryNavId; label: string; sectionId: string }[] = [
-  { id: 'discourses', label: 'Discourses', sectionId: 'catalog-section' },
-  { id: 'sayadaws', label: 'Sayadaws', sectionId: 'sayadaws-section' },
-  { id: 'tips', label: 'Meditation Tips', sectionId: 'tips-section' },
-  { id: 'events', label: 'Events', sectionId: 'events-section' },
-  { id: 'forms', label: 'Forms', sectionId: 'forms-section' },
+export const NAV_SECTION_LIST: { id: PrimaryNavId; sectionId: string }[] = [
+  { id: 'discourses', sectionId: 'catalog-section' },
+  { id: 'sayadaws', sectionId: 'sayadaws-section' },
+  { id: 'tips', sectionId: 'tips-section' },
+  { id: 'events', sectionId: 'events-section' },
+  { id: 'forms', sectionId: 'forms-section' },
 ];
 
 export const SECTION_IDS: Record<Exclude<NavSection, 'reader' | 'login'>, string> = {
@@ -70,67 +75,35 @@ export const SECTION_IDS: Record<Exclude<NavSection, 'reader' | 'login'>, string
 };
 
 export const TAXONOMY = {
-  collections: [
-    'Abhidhamma',
-    'Satipatthana & Vipassana',
-    'Sutta Pitaka',
-    'Visuddhimagga',
-    'Monastic Talks',
-  ] as TraditionCollection[],
-  collectionPrefixes: {
-    Abhidhamma: 'ABH',
-    'Satipatthana & Vipassana': 'VIP',
-    'Sutta Pitaka': 'SUT',
-    Visuddhimagga: 'VIS',
-    'Monastic Talks': 'MNK',
-  } as Record<TraditionCollection, string>,
-  languages: [
-    'Pāli · 繁體中文 · English',
-    'Pāli · English',
-    'English',
-    '繁體中文',
-  ] as DiscourseLanguage[],
-  tipCategories: [
-    'Breath & Anchor',
-    'Posture & Walking',
-    'Working with Hindrances',
-    'Daily Mindfulness',
-  ] as TipCategory[],
-  eventTypes: [
-    'Retreat Course',
-    'Group Sitting',
-    'Dhamma Talk',
-    'Study Circle',
-  ] as EventType[],
-  eventStatuses: [
-    'Registration Open',
-    'Drop-In Welcome',
-    'Waitlist',
-    'Completed',
-  ] as EventStatus[],
-  monthNames: [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ],
-  weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  locales: SITE_LOCALES,
+  collections: TRADITION_COLLECTIONS,
+  collectionPrefixes: COLLECTION_PREFIXES,
+  languages: DISCOURSE_LANGUAGES,
+  tipCategories: TIP_CATEGORIES,
+  eventTypes: EVENT_TYPES,
+  eventStatuses: EVENT_STATUSES,
   formHeightOptions: [
-    { label: 'Compact', px: 560 },
-    { label: 'Standard', px: 760 },
-    { label: 'Tall', px: 960 },
+    { key: 'compact' as const, px: 560 },
+    { key: 'standard' as const, px: 760 },
+    { key: 'tall' as const, px: 960 },
   ],
-};
+} as const;
 
 export const STORAGE_KEYS = {
+  discourses: 'vipassana_bhavana_stored_discourses_v2',
+  sayadaws: 'vipassana_bhavana_sayadaws_v2',
+  tips: 'vipassana_bhavana_tips_v2',
+  events: 'vipassana_bhavana_events_v2',
+  formTabs: 'vipassana_bhavana_forms_v2',
+  deletedPaths: 'vipassana_bhavana_deleted_paths_v2',
+  bookmarks: 'vipassana_bhavana_bookmarks_v2',
+  prefs: 'vipassana_bhavana_reader_prefs_v2',
+  dirtyDraft: 'vipassana_bhavana_dirty_draft_v2',
+  patSession: 'vipassana_bhavana_owner_pat_v2',
+  userSession: 'vipassana_bhavana_owner_user_v2',
+} as const;
+
+export const LEGACY_STORAGE_KEYS: Partial<Record<keyof typeof STORAGE_KEYS, string>> = {
   discourses: 'nanda_dhamma_stored_discourses_v1',
   sayadaws: 'vipassana_bhavana_sayadaws_v1',
   tips: 'vipassana_bhavana_tips_v1',
@@ -142,4 +115,4 @@ export const STORAGE_KEYS = {
   dirtyDraft: 'vipassana_bhavana_dirty_draft_v1',
   patSession: 'vipassana_bhavana_owner_pat_v1',
   userSession: 'vipassana_bhavana_owner_user_v1',
-} as const;
+};

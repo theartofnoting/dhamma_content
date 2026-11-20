@@ -39,109 +39,92 @@ export function LoginPage({
   };
 
   return (
-    <section className="mx-auto max-w-[680px] px-4 py-12 sm:px-8 sm:py-20 space-y-8">
-      <div className={`flex items-center justify-between gap-4 pb-5 border-b ${THEME_CLASSES.borderHairline}`}>
+    <section className="mx-auto max-w-[680px] px-4 py-14 sm:px-8 sm:py-20 space-y-8">
+      <div className="space-y-3">
         <button
           type="button"
           onClick={onBackToArchive}
-          className={`inline-flex items-center gap-2 min-h-[40px] text-xs font-medium ${THEME_CLASSES.inkSecondary} hover:text-[var(--accent-ink)] cursor-pointer`}
+          className={`inline-flex items-center gap-2 text-xs font-medium ${THEME_CLASSES.inkMuted} hover:text-[var(--accent-ink)] cursor-pointer`}
         >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          <span>Back to Archive</span>
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>Back to Public Archive</span>
         </button>
-
-        <span className={`font-mono-code text-xs ${THEME_CLASSES.inkSubtle}`}>
-          @{GITHUB_CONFIG.owner}
-        </span>
+        <p className={`text-xs tracking-widest uppercase ${THEME_CLASSES.inkSubtle}`}>
+          Owner Administration · {GITHUB_CONFIG.repoSlug}
+        </p>
+        <h1 className={`font-display text-3xl sm:text-4xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
+          Sign In as Archive Owner
+        </h1>
+        <p className={`text-sm leading-relaxed ${THEME_CLASSES.inkMuted}`}>
+          Public visitors can read all Sayadaw discourses, meditation tips, events, and submission
+          forms freely. Publishing, editing, and deleting archive records is restricted to{' '}
+          <span className="font-mono-code">@{GITHUB_CONFIG.owner}</span>.
+        </p>
       </div>
 
-      {errorMsg && (
-        <div role="alert" className={THEME_CLASSES.alertError}>
-          {errorMsg}
-        </div>
-      )}
-
-      {auth.isOwner && auth.user ? (
-        <div className={`p-6 sm:p-8 ${THEME_CLASSES.card} space-y-6`}>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              {auth.user.avatar_url && (
-                <img
-                  src={auth.user.avatar_url}
-                  alt={auth.user.login}
-                  className={`h-12 w-12 border ${THEME_CLASSES.borderStrong} object-cover`}
-                />
-              )}
-              <div>
-                <p className={`inline-flex items-center gap-1.5 text-xs font-mono-code ${THEME_CLASSES.successInk}`}>
-                  <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-                  <span>Owner Session Active</span>
-                </p>
-                <h1 className={`font-display text-2xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
-                  {auth.user.name || `@${auth.user.login}`}{' '}
-                  <span className={`font-mono-code text-sm font-normal ${THEME_CLASSES.inkSubtle}`}>
-                    @{auth.user.login}
-                  </span>
-                </h1>
-              </div>
+      {auth.isOwner ? (
+        <div className={`p-6 sm:p-8 ${THEME_CLASSES.card} space-y-5`}>
+          <div className="flex items-center gap-3">
+            <ShieldCheck className={`h-6 w-6 ${THEME_CLASSES.successInk}`} aria-hidden="true" />
+            <div>
+              <p className={`font-display text-2xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
+                Signed in as @{auth.user?.login || GITHUB_CONFIG.owner}
+              </p>
+              <p className={`text-xs ${THEME_CLASSES.inkMuted}`}>
+                Owner editing and GitHub publishing tools are unlocked for this browser session.
+              </p>
             </div>
+          </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <button type="button" onClick={onBackToArchive} className={THEME_CLASSES.btnPrimary}>
-                Return to Archive
-              </button>
-              <button type="button" onClick={onLogout} className={THEME_CLASSES.btnSecondary}>
-                <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Sign Out</span>
-              </button>
-            </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={onBackToArchive} className={THEME_CLASSES.btnPrimary}>
+              Manage Archive Content
+            </button>
+            <button type="button" onClick={onLogout} className={THEME_CLASSES.btnOutline}>
+              <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Sign Out</span>
+            </button>
           </div>
         </div>
       ) : (
-        <div className={`p-6 sm:p-10 ${THEME_CLASSES.card} space-y-6`}>
-          <div className="space-y-2">
-            <p className={`inline-flex items-center gap-1.5 font-mono-code text-xs ${THEME_CLASSES.accentInk}`}>
-              <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Owner Access</span>
-            </p>
-            <h1 className={`font-display text-3xl sm:text-4xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
-              Sign In with GitHub Token
-            </h1>
-            <p className={`text-sm leading-relaxed ${THEME_CLASSES.inkMuted}`}>
-              Enter a GitHub personal access token for{' '}
-              <span className={`font-mono-code ${THEME_CLASSES.inkPrimary}`}>
-                @{GITHUB_CONFIG.owner}
-              </span>{' '}
-              to add, edit, and publish archive content.
+        <form onSubmit={handlePatSubmit} className={`p-6 sm:p-8 ${THEME_CLASSES.card} space-y-5`}>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <KeyRound className={`h-4 w-4 ${THEME_CLASSES.accentInk}`} aria-hidden="true" />
+              <label htmlFor="owner-pat-input" className={THEME_CLASSES.label}>
+                GitHub Personal Access Token (Fine-Grained · Contents: Read &amp; Write)
+              </label>
+            </div>
+            <input
+              id="owner-pat-input"
+              type="password"
+              value={patInput}
+              onChange={(e) => setPatInput(e.target.value)}
+              placeholder="github_pat_..."
+              autoComplete="off"
+              className={THEME_CLASSES.inputMono}
+            />
+            <p className={`text-xs ${THEME_CLASSES.inkMuted} leading-relaxed`}>
+              Your token stays strictly in browser session storage and authenticates directly with
+              GitHub&apos;s API on <span className="font-mono-code">{GITHUB_CONFIG.repoSlug}</span>.
             </p>
           </div>
 
-          <form onSubmit={handlePatSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label htmlFor="github-pat-input" className={THEME_CLASSES.label}>
-                GitHub Token
-              </label>
-              <input
-                id="github-pat-input"
-                type="password"
-                required
-                autoComplete="off"
-                value={patInput}
-                onChange={(e) => setPatInput(e.target.value)}
-                placeholder="github_pat_..."
-                className={THEME_CLASSES.inputMono}
-              />
+          {errorMsg && (
+            <div role="alert" className={THEME_CLASSES.alertError}>
+              {errorMsg}
             </div>
+          )}
 
-            <button
-              type="submit"
-              disabled={patBusy}
-              className={`${THEME_CLASSES.btnAccent} w-full min-h-[44px] text-sm`}
-            >
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="submit" disabled={patBusy} className={THEME_CLASSES.btnAccent}>
               {patBusy ? 'Verifying...' : 'Verify & Sign In'}
             </button>
-          </form>
-        </div>
+            <button type="button" onClick={onBackToArchive} className={THEME_CLASSES.btnSecondary}>
+              Cancel
+            </button>
+          </div>
+        </form>
       )}
     </section>
   );

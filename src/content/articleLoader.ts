@@ -34,11 +34,35 @@ function resolveCollection(raw?: string): TraditionCollection {
 }
 
 function resolveLanguage(raw?: string): DiscourseLanguage {
-  if (!raw) return 'Pāli · English';
-  if (raw.includes('繁體中文') && raw.includes('English')) return 'Pāli · 繁體中文 · English';
-  if (raw.includes('繁體中文')) return '繁體中文';
-  if (raw === 'English') return 'English';
-  return 'Pāli · English';
+  const defaultLanguage = TAXONOMY.languages[0];
+  if (!raw) return defaultLanguage;
+
+  const exact = TAXONOMY.languages.find((lang) => lang.toLowerCase() === raw.trim().toLowerCase());
+  if (exact) return exact;
+
+  const lower = raw.toLowerCase();
+  const hasVietnamese = lower.includes('vietnam') || lower.includes('việt');
+  const hasEnglish = lower.includes('english');
+  const hasPali = lower.includes('pali') || lower.includes('pāli');
+
+  if (hasPali && hasVietnamese && hasEnglish) {
+    return (
+      TAXONOMY.languages.find(
+        (l) => l.includes('Pāli') && l.includes('Vietnamese') && l.includes('English'),
+      ) || defaultLanguage
+    );
+  }
+  if (hasVietnamese) {
+    return TAXONOMY.languages.find((l) => l.includes('Vietnamese')) || defaultLanguage;
+  }
+  if (hasPali && hasEnglish) {
+    return TAXONOMY.languages.find((l) => l.includes('Pāli') && l.includes('English')) || defaultLanguage;
+  }
+  if (hasEnglish) {
+    return TAXONOMY.languages.find((l) => l === 'English') || defaultLanguage;
+  }
+
+  return defaultLanguage;
 }
 
 function inferPathSegments(filePath: string): {
@@ -55,6 +79,7 @@ function inferPathSegments(filePath: string): {
 
   const withoutContent = parts[0] === 'content' ? parts.slice(1) : parts;
   const withoutPrefix = withoutContent[0] === 'articles' ? withoutContent.slice(1) : withoutContent;
+
   if (withoutPrefix.length >= 3) {
     return {
       collectionSlug: slugifySegment(withoutPrefix[0]),
@@ -95,11 +120,69 @@ function matchSayadawBySlugOrName(
   if (found) {
     return { sayadawId: found.id, sayadawName: found.name };
   }
+
   const cleanName = name?.trim() || slugOrId?.replace(/-/g, ' ') || 'Group Sayadaw';
   return {
     sayadawId: slugOrId ? slugifySegment(slugOrId) : slugifySegment(cleanName),
     sayadawName: cleanName,
   };
+}
+
+function parseMarkdownFrontmatter(raw: string): {
+  meta: Record<string, string>;
+  body: string;
+} {
+  const normalized = raw.replace(/\r\n/g, '\n');
+  const match = normalized.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!match) {
+    return { meta: {}, body: normalized };
+  }
+  const meta: Record<string, string> = {};
+  for (const line of match[1].split('\n')) {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx === -1) continue;
+    const key = line.slice(0, colonIdx).trim().toLowerCase();
+    const value = line
+      .slice(colonIdx + 1)
+      .trim()
+      .replace(/^["']|["']$/g, '');
+    if (key) meta[key] = value;
+  }
+  return { meta, body: match[2] };
+}
+
+function parseSectionsFromBody(body: string, fallbackHeading: string): DiscourseSection[] {
+  const chunks = body.split(/^##\s+/m);
+  const sections: DiscourseSection[] = [];
+
+  for (const chunk of chunks) {
+    const trimmed = chunk.trim();
+    if (!trimmed) continue;
+    const lines = trimmed.split('\n');
+    const heading = lines[0].replace(/^#+\s*/, '').trim() || fallbackHeading;
+    const paragraphs = lines
+      .slice(1)
+      .join('\n')
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0 && !p.startsWith('# '));
+
+    if (paragraphs.length > 0) {
+      sections.push({ heading, paragraphs });
+    }
+  }
+
+  if (sections.length === 0 && body.trim()) {
+    sections.push({
+      heading: fallbackHeading,
+      paragraphs: body
+        .split(/\n{2,}/)
+        .map((p) => p.trim())
+        .filter(Boolean),
+    });
+  }
+
+  return sections;
 }
 
 function parseMarkdownArticle(
@@ -108,93 +191,45 @@ function parseMarkdownArticle(
   sayadaws: SayadawProfile[],
   index: number,
 ): DhammaDiscourse {
-  const pathMeta = inferPathSegments(filePath);
-  const meta: Record<string, string> = {};
-  let body = raw;
-
-  const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (fmMatch) {
-    const fmLines = fmMatch[1].split(/\r?\n/);
-    for (const line of fmLines) {
-      const colonIdx = line.indexOf(':');
-      if (colonIdx > 0) {
-        const key = line.slice(0, colonIdx).trim().toLowerCase();
-        const val = line
-          .slice(colonIdx + 1)
-          .trim()
-          .replace(/^["']|["']$/g, '');
-        if (val) meta[key] = val;
-      }
-    }
-    body = fmMatch[2];
-  }
-
-  const lines = body.split(/\r?\n/);
-  let title = meta.title || '';
-  const sections: DiscourseSection[] = [];
-  let currentHeading = '1. Discourse Exposition';
-  let currentParagraphs: string[] = [];
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!title && line.startsWith('# ')) {
-      title = line.replace(/^#\s+/, '');
-      continue;
-    }
-    if (line.startsWith('## ')) {
-      if (currentParagraphs.length > 0) {
-        sections.push({ heading: currentHeading, paragraphs: currentParagraphs });
-      }
-      currentHeading = line.replace(/^##\s+/, '');
-      currentParagraphs = [];
-    } else if (line && !line.startsWith('>')) {
-      currentParagraphs.push(line);
-    }
-  }
-
-  if (currentParagraphs.length > 0 || sections.length === 0) {
-    sections.push({
-      heading: currentHeading,
-      paragraphs:
-        currentParagraphs.length > 0 ? currentParagraphs : ['Recorded Dhamma discourse.'],
-    });
-  }
-
+  const { meta, body } = parseMarkdownFrontmatter(raw);
+  const pathInfo = inferPathSegments(filePath);
+  const collection = resolveCollection(meta.collection || pathInfo.collectionSlug);
   const sayadawInfo = matchSayadawBySlugOrName(
-    meta.sayadaw_slug || pathMeta.sayadawSlug,
+    meta.sayadaw_slug || pathInfo.sayadawSlug,
     meta.sayadaw,
     sayadaws,
   );
-  const collection = resolveCollection(meta.collection || pathMeta.collectionSlug);
-  const discourseSlug = meta.slug || pathMeta.fileSlug;
-  const collectionSlug = meta.collection_slug || pathMeta.collectionSlug;
+  const headingMatch = body.match(/^#\s+(.+)$/m);
+  const title = meta.title || headingMatch?.[1]?.trim() || pathInfo.fileSlug.replace(/-/g, ' ');
+  const sections = parseSectionsFromBody(body, title);
 
+  const prefix = TAXONOMY.collectionPrefixes[collection];
   const draft: DhammaDiscourse = {
-    id: `article-${sayadawInfo.sayadawId}-${discourseSlug}`,
-    accessionCode: meta.accession || `ART. ${String(index + 1).padStart(2, '0')}`,
-    slug: discourseSlug,
-    collectionSlug,
+    id: meta.slug || `${pathInfo.sayadawSlug}-${pathInfo.fileSlug}`,
+    accessionCode: meta.accession || `${prefix}-${String(index + 1).padStart(3, '0')}`,
+    slug: meta.slug || slugifySegment(pathInfo.fileSlug),
+    collectionSlug: meta.collection_slug || pathInfo.collectionSlug,
     sourceFormat: 'md',
-    title: title || discourseSlug.replace(/-/g, ' '),
-    chineseTitle: meta.chinese_title || undefined,
+    title,
+    vietnameseTitle: meta.vietnamese_title || undefined,
     paliSubtitle: meta.pali_subtitle || undefined,
     sayadawId: sayadawInfo.sayadawId,
     sayadawName: sayadawInfo.sayadawName,
     collection,
     language: resolveLanguage(meta.language),
-    dateRecorded: meta.date || meta.date_recorded || 'Archive Article',
+    dateRecorded: meta.date_recorded || meta.date || 'Archive Discourse',
     readingMinutes: 5,
-    sourceText: meta.source || meta.source_text || 'Archive Article',
+    sourceText: meta.source_text || meta.source || 'Markdown Archive Entry',
     summary: meta.summary || sections[0]?.paragraphs[0]?.slice(0, 220) || title,
     sections,
     pullQuote:
       meta.pull_quote ||
       sections[0]?.paragraphs[0]?.slice(0, 160) ||
-      'Observe phenomena as they arise and pass away.',
+      'Contemplate arising and passing away in the present moment.',
     marginNotes: [],
-    footnotes: meta.source ? [{ index: 1, text: meta.source }] : [],
+    footnotes: meta.source_text ? [{ index: 1, text: meta.source_text }] : [],
     coverImage: meta.cover_image || undefined,
-    audioReferenceUrl: meta.audio || meta.audio_reference || undefined,
+    audioReferenceUrl: meta.audio_reference || meta.audio || undefined,
     repoPath: filePath.replace(/^\/+/, ''),
   };
 
@@ -208,133 +243,65 @@ function parseRstArticle(
   sayadaws: SayadawProfile[],
   index: number,
 ): DhammaDiscourse {
-  const pathMeta = inferPathSegments(filePath);
-  const lines = raw.split(/\r?\n/);
+  const normalized = raw.replace(/\r\n/g, '\n');
+  const lines = normalized.split('\n');
   const meta: Record<string, string> = {};
   const mediaItems: DiscourseMediaItem[] = [];
-
-  let title = '';
   const bodyLines: string[] = [];
+  let title = '';
 
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    const trimmed = line.trim();
-    const nextTrimmed = (lines[i + 1] || '').trim();
-
-    if (
-      /^[=\-*~^]{4,}$/.test(trimmed) &&
-      i + 2 < lines.length &&
-      /^[=\-*~^]{4,}$/.test((lines[i + 2] || '').trim())
-    ) {
-      const candidate = (lines[i + 1] || '').trim();
-      if (!title && candidate) {
-        title = candidate;
-        i += 2;
-        continue;
-      }
-    }
-
-    if (trimmed && /^[=\-~^]{4,}$/.test(nextTrimmed)) {
-      if (!title && (nextTrimmed.startsWith('=') || nextTrimmed.startsWith('*'))) {
-        title = trimmed;
-        i += 1;
-        continue;
-      }
-      bodyLines.push(`## ${trimmed}`);
+    if (!title && i + 1 < lines.length && /^[=-]{4,}$/.test(lines[i + 1].trim()) && line.trim()) {
+      title = line.trim();
       i += 1;
       continue;
     }
 
-    const fieldMatch = trimmed.match(/^:([a-zA-Z0-9_]+):\s*(.+)$/);
+    const fieldMatch = line.match(/^:([a-zA-Z0-9_]+):\s*(.*)$/);
     if (fieldMatch) {
       meta[fieldMatch[1].toLowerCase()] = fieldMatch[2].trim();
       continue;
     }
 
-    const dirMatch = trimmed.match(/^\.\.\s+(image|figure|audio|video)::\s*(.+)$/i);
-    if (dirMatch) {
-      const dirType = dirMatch[1].toLowerCase();
-      const targetUrl = dirMatch[2].trim();
-      if (dirType === 'image' || dirType === 'figure') {
-        if (!meta.cover_image) {
-          meta.cover_image = targetUrl;
-        } else {
-          mediaItems.push({
-            id: `rst-media-${i}`,
-            type: 'image',
-            title: `Figure ${mediaItems.length + 1}`,
-            url: targetUrl,
-          });
-        }
-      } else {
-        mediaItems.push({
-          id: `rst-media-${i}`,
-          type: dirType === 'audio' ? 'audio' : 'video',
-          title: `${dirType.toUpperCase()} Recording`,
-          url: targetUrl,
-        });
-      }
+    const directiveMatch = line.match(/^\.\.\s+(image|audio|video)::\s+(.+)$/i);
+    if (directiveMatch) {
+      const type = directiveMatch[1].toLowerCase() as 'image' | 'audio' | 'video';
+      const url = directiveMatch[2].trim();
+      mediaItems.push({
+        id: `rst-media-${mediaItems.length + 1}`,
+        type,
+        title: url.split('/').pop() || type,
+        url,
+      });
       continue;
     }
 
-    if (trimmed.startsWith('.. ')) continue;
-
+    if (/^[=-]{4,}$/.test(line.trim())) {
+      continue;
+    }
     bodyLines.push(line);
   }
 
-  const sections: DiscourseSection[] = [];
-  let currentHeading = '1. Discourse Text';
-  let currentParagraphs: string[] = [];
-  let paraBuf: string[] = [];
-
-  const flushParagraph = () => {
-    if (paraBuf.length > 0) {
-      currentParagraphs.push(paraBuf.join(' ').trim());
-      paraBuf = [];
-    }
-  };
-
-  for (const bLine of bodyLines) {
-    const t = bLine.trim();
-    if (t.startsWith('## ')) {
-      flushParagraph();
-      if (currentParagraphs.length > 0) {
-        sections.push({ heading: currentHeading, paragraphs: currentParagraphs });
-      }
-      currentHeading = t.replace(/^##\s+/, '');
-      currentParagraphs = [];
-    } else if (!t) {
-      flushParagraph();
-    } else {
-      paraBuf.push(t);
-    }
-  }
-  flushParagraph();
-  if (currentParagraphs.length > 0 || sections.length === 0) {
-    sections.push({
-      heading: currentHeading,
-      paragraphs:
-        currentParagraphs.length > 0 ? currentParagraphs : ['Recorded Dhamma discourse.'],
-    });
-  }
-
+  const pathInfo = inferPathSegments(filePath);
+  const collection = resolveCollection(meta.collection || pathInfo.collectionSlug);
   const sayadawInfo = matchSayadawBySlugOrName(
-    meta.sayadaw_slug || pathMeta.sayadawSlug,
+    meta.sayadaw_slug || pathInfo.sayadawSlug,
     meta.sayadaw,
     sayadaws,
   );
-  const collection = resolveCollection(meta.collection || pathMeta.collectionSlug);
-  const discourseSlug = meta.slug || pathMeta.fileSlug;
-  const collectionSlug = meta.collection_slug || pathMeta.collectionSlug;
+  const resolvedTitle = meta.title || title || pathInfo.fileSlug.replace(/-/g, ' ');
+  const sections = parseSectionsFromBody(bodyLines.join('\n'), resolvedTitle);
+  const prefix = TAXONOMY.collectionPrefixes[collection];
 
   const draft: DhammaDiscourse = {
-    id: `rst-${sayadawInfo.sayadawId}-${discourseSlug}`,
-    accessionCode: meta.accession || `RST. ${String(index + 1).padStart(2, '0')}`,
-    slug: discourseSlug,
-    collectionSlug,
+    id: meta.slug || `${pathInfo.sayadawSlug}-${pathInfo.fileSlug}`,
+    accessionCode: meta.accession || `${prefix}-${String(index + 1).padStart(3, '0')}`,
+    slug: meta.slug || slugifySegment(pathInfo.fileSlug),
+    collectionSlug: meta.collection_slug || pathInfo.collectionSlug,
     sourceFormat: 'rst',
-    title: title || discourseSlug.replace(/-/g, ' '),
-    chineseTitle: meta.chinese_title || undefined,
+    title: resolvedTitle,
+    vietnameseTitle: meta.vietnamese_title || undefined,
     paliSubtitle: meta.pali_subtitle || undefined,
     sayadawId: sayadawInfo.sayadawId,
     sayadawName: sayadawInfo.sayadawName,
@@ -343,7 +310,7 @@ function parseRstArticle(
     dateRecorded: meta.date || 'Archive Discourse',
     readingMinutes: 5,
     sourceText: meta.source || 'reStructuredText Archive Entry',
-    summary: meta.summary || sections[0]?.paragraphs[0]?.slice(0, 220) || title,
+    summary: meta.summary || sections[0]?.paragraphs[0]?.slice(0, 220) || resolvedTitle,
     sections,
     pullQuote:
       meta.pull_quote ||
@@ -393,15 +360,15 @@ export function discourseToRst(d: DhammaDiscourse, sayadaws: SayadawProfile[]): 
     `:pull_quote: ${d.pullQuote}`,
   ];
 
+  if (d.vietnameseTitle) lines.push(`:vietnamese_title: ${d.vietnameseTitle}`);
+  if (d.paliSubtitle) lines.push(`:pali_subtitle: ${d.paliSubtitle}`);
   if (d.coverImage) lines.push(`:cover_image: ${d.coverImage}`);
   if (d.audioReferenceUrl) lines.push(`:audio: ${d.audioReferenceUrl}`);
-
   lines.push('');
 
   if (d.coverImage) {
     lines.push(`.. image:: ${d.coverImage}`, '');
   }
-
   if (d.mediaItems) {
     for (const item of d.mediaItems) {
       if (item.type === 'audio' || item.type === 'video' || item.type === 'image') {

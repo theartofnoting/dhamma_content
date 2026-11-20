@@ -1,15 +1,23 @@
-import { NAV_ITEMS, SITE_CONFIG } from '../config/siteConfig';
+import { NAV_SECTION_LIST, SITE_CONFIG } from '../config/siteConfig';
+import { LocaleDictionary } from '../i18n';
 import { THEME_CLASSES } from '../theme/uiClasses';
 import { NavSection } from '../types/dhamma';
 
 interface HeaderProps {
   activeSection: NavSection;
   isOwner: boolean;
+  dict: LocaleDictionary;
   onNavigate: (target: NavSection) => void;
   onOpenStoreModal: () => void;
 }
 
-export function Header({ activeSection, isOwner, onNavigate, onOpenStoreModal }: HeaderProps) {
+export function Header({
+  activeSection,
+  isOwner,
+  dict,
+  onNavigate,
+  onOpenStoreModal,
+}: HeaderProps) {
   return (
     <header
       className={`sticky top-0 z-30 border-b ${THEME_CLASSES.borderHairline} bg-[var(--surface-canvas)]/95 backdrop-blur-sm`}
@@ -24,10 +32,10 @@ export function Header({ activeSection, isOwner, onNavigate, onOpenStoreModal }:
         </button>
 
         <nav
-          aria-label="Primary navigation"
+          aria-label={dict.nav.primaryAria}
           className={`hidden md:flex items-center gap-6 lg:gap-7 text-sm font-medium ${THEME_CLASSES.inkMuted}`}
         >
-          {NAV_ITEMS.map((item) => {
+          {NAV_SECTION_LIST.map((item) => {
             const isActive = activeSection === item.id;
             return (
               <button
@@ -40,7 +48,7 @@ export function Header({ activeSection, isOwner, onNavigate, onOpenStoreModal }:
                     : 'hover:text-[var(--ink-primary)] hover:underline hover:decoration-[var(--border-strong)] hover:underline-offset-8'
                 }`}
               >
-                {item.label}
+                {dict.nav[item.id]}
               </button>
             );
           })}
@@ -53,7 +61,7 @@ export function Header({ activeSection, isOwner, onNavigate, onOpenStoreModal }:
               onClick={onOpenStoreModal}
               className="min-h-[40px] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
             >
-              Store Teaching
+              {dict.nav.storeTeaching}
             </button>
           ) : (
             <button
@@ -61,18 +69,17 @@ export function Header({ activeSection, isOwner, onNavigate, onOpenStoreModal }:
               onClick={() => onNavigate('reader')}
               className="min-h-[40px] px-4 py-2 text-sm font-medium bg-[var(--ink-primary)] text-[var(--surface-canvas)] hover:bg-[var(--accent-primary)] hover:text-[var(--accent-contrast)] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
             >
-              Reading Room
+              {dict.nav.readingRoom}
             </button>
           )}
         </div>
       </div>
 
-      {/* Compact single-row mobile navigation bar */}
       <nav
-        aria-label="Mobile navigation"
+        aria-label={dict.nav.mobileAria}
         className={`flex md:hidden items-center gap-5 overflow-x-auto border-t ${THEME_CLASSES.borderHairline} px-4 py-2 text-xs font-medium ${THEME_CLASSES.inkMuted}`}
       >
-        {NAV_ITEMS.map((item) => {
+        {NAV_SECTION_LIST.map((item) => {
           const isActive = activeSection === item.id;
           return (
             <button
@@ -85,7 +92,7 @@ export function Header({ activeSection, isOwner, onNavigate, onOpenStoreModal }:
                   : 'hover:text-[var(--ink-primary)]'
               }`}
             >
-              {item.label}
+              {dict.nav[item.id]}
             </button>
           );
         })}

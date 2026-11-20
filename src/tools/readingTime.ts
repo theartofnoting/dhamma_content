@@ -3,7 +3,7 @@ import { DhammaDiscourse } from '../types/dhamma';
 export function calculateEstimatedReadingMinutes(discourse: DhammaDiscourse): number {
   const textParts: string[] = [
     discourse.title,
-    discourse.chineseTitle || '',
+    discourse.vietnameseTitle || '',
     discourse.paliSubtitle || '',
     discourse.summary,
     discourse.pullQuote,
@@ -21,11 +21,7 @@ export function calculateEstimatedReadingMinutes(discourse: DhammaDiscourse): nu
   }
 
   const combined = textParts.join(' ');
-  const cjkMatches = combined.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g);
-  const cjkCount = cjkMatches ? cjkMatches.length : 0;
-
-  const nonCjkText = combined.replace(/[\u4e00-\u9fff\u3400-\u4dbf]/g, ' ');
-  const wordCount = nonCjkText
+  const wordCount = combined
     .trim()
     .split(/\s+/)
     .filter((w) => w.length > 0).length;
@@ -34,6 +30,6 @@ export function calculateEstimatedReadingMinutes(discourse: DhammaDiscourse): nu
   const studyBufferMinutes =
     Math.min(4, discourse.marginNotes.length) * 0.75 + paliExcerptsCount * 0.75;
 
-  const rawMinutes = wordCount / 125 + cjkCount / 260 + studyBufferMinutes;
+  const rawMinutes = wordCount / 145 + studyBufferMinutes;
   return Math.max(2, Math.round(rawMinutes));
 }

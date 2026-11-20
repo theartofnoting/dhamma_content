@@ -1,4 +1,4 @@
-import { GITHUB_CONFIG, STORAGE_KEYS } from '../config/siteConfig';
+import { GITHUB_CONFIG, LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '../config/siteConfig';
 import { resolveAssetUrl } from '../plugins/mediaResolver';
 import {
   DhammaDiscourse,
@@ -10,9 +10,29 @@ import {
   SayadawProfile,
 } from '../types/dhamma';
 
-function readJsonFromStorage<T>(key: string, fallback: T): T {
+function readRawWithLegacyFallback(key: keyof typeof STORAGE_KEYS): string | null {
   try {
-    const raw = localStorage.getItem(key);
+    const primaryKey = STORAGE_KEYS[key];
+    const current = localStorage.getItem(primaryKey);
+    if (current !== null) return current;
+
+    const legacyKey = LEGACY_STORAGE_KEYS[key];
+    if (!legacyKey) return null;
+    const legacyValue = localStorage.getItem(legacyKey);
+    if (legacyValue !== null) {
+      localStorage.setItem(primaryKey, legacyValue);
+      localStorage.removeItem(legacyKey);
+      return legacyValue;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function readJsonFromStorage<T>(key: keyof typeof STORAGE_KEYS, fallback: T): T {
+  try {
+    const raw = readRawWithLegacyFallback(key);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as T;
     return parsed ?? fallback;
@@ -21,7 +41,7 @@ function readJsonFromStorage<T>(key: string, fallback: T): T {
   }
 }
 
-function readArrayFromStorage<T>(key: string, fallback: T[]): T[] {
+function readArrayFromStorage<T>(key: keyof typeof STORAGE_KEYS, fallback: T[]): T[] {
   const parsed = readJsonFromStorage<unknown>(key, fallback);
   return Array.isArray(parsed) ? (parsed as T[]) : fallback;
 }
@@ -34,50 +54,66 @@ function writeJsonToStorage(key: string, value: unknown): void {
   }
 }
 
+export function normalizeSayadawProfile(raw: SayadawProfile & { chineseName?: string }): SayadawProfile {
+  const { chineseName, ...rest } = raw;
+  return {
+    ...rest,
+    vietnameseName: rest.vietnameseName || chineseName || undefined,
+  };
+}
+
+export function normalizeDiscourseRecord(
+  raw: DhammaDiscourse & { chineseTitle?: string },
+): DhammaDiscourse {
+  const { chineseTitle, ...rest } = raw;
+  return {
+    ...rest,
+    vietnameseTitle: rest.vietnameseTitle || chineseTitle || undefined,
+  };
+}
+
 export const loadStoredDiscourses = (fallback: DhammaDiscourse[] = []): DhammaDiscourse[] =>
-  readArrayFromStorage<DhammaDiscourse>(STORAGE_KEYS.discourses, fallback);
+  readArrayFromStorage<DhammaDiscourse>('discourses', fallback).map(normalizeDiscourseRecord);
 
 export const saveStoredDiscourses = (discourses: DhammaDiscourse[]): void =>
   writeJsonToStorage(STORAGE_KEYS.discourses, discourses);
 
 export const loadStoredDeletedPaths = (): string[] =>
-  readArrayFromStorage<string>(STORAGE_KEYS.deletedPaths, []);
+  readArrayFromStorage<string>('deletedPaths', []);
 
 export const saveStoredDeletedPaths = (paths: string[]): void =>
   writeJsonToStorage(STORAGE_KEYS.deletedPaths, paths);
 
 export const loadStoredTips = (fallback: MeditationTip[] = []): MeditationTip[] =>
-  readArrayFromStorage<MeditationTip>(STORAGE_KEYS.tips, fallback);
+  readArrayFromStorage<MeditationTip>('tips', fallback);
 
 export const saveStoredTips = (tips: MeditationTip[]): void =>
   writeJsonToStorage(STORAGE_KEYS.tips, tips);
 
 export const loadStoredEvents = (fallback: GroupEvent[] = []): GroupEvent[] =>
-  readArrayFromStorage<GroupEvent>(STORAGE_KEYS.events, fallback);
+  readArrayFromStorage<GroupEvent>('events', fallback);
 
 export const saveStoredEvents = (events: GroupEvent[]): void =>
   writeJsonToStorage(STORAGE_KEYS.events, events);
 
 export const loadStoredFormTabs = (fallback: GoogleFormTab[] = []): GoogleFormTab[] =>
-  readArrayFromStorage<GoogleFormTab>(STORAGE_KEYS.formTabs, fallback);
+  readArrayFromStorage<GoogleFormTab>('formTabs', fallback);
 
 export const saveStoredFormTabs = (tabs: GoogleFormTab[]): void =>
   writeJsonToStorage(STORAGE_KEYS.formTabs, tabs);
 
 export const loadStoredCustomSayadaws = (): SayadawProfile[] =>
-  readArrayFromStorage<SayadawProfile>(STORAGE_KEYS.sayadaws, []);
+  readArrayFromStorage<SayadawProfile>('sayadaws', []).map(normalizeSayadawProfile);
 
 export const saveStoredCustomSayadaws = (sayadaws: SayadawProfile[]): void =>
   writeJsonToStorage(STORAGE_KEYS.sayadaws, sayadaws);
 
-export const loadBookmarks = (): string[] =>
-  readArrayFromStorage<string>(STORAGE_KEYS.bookmarks, []);
+export const loadBookmarks = (): string[] => readArrayFromStorage<string>('bookmarks', []);
 
-export const saveBookmarks = (ids: string[]): void =>
-  writeJsonToStorage(STORAGE_KEYS.bookmarks, ids);
+export const saveBookmarks = (ids: string[]): void => writeJsonToStorage(STORAGE_KEYS.bookmarks, ids);
 
 export function loadReaderPrefs(): ReaderPreferences {
-  const parsed = readJsonFromStorage<Partial<ReaderPreferences>>(STORAGE_KEYS.prefs, {});
+  const parsed = readJsonFromStorage<Partial<ReaderPreferences>>('prefs', {});
   return {
     fontSize:
       parsed.fontSize === 'small' || parsed.fontSize === 'large' ? parsed.fontSize : 'standard',
@@ -90,7 +126,7 @@ export const saveReaderPrefs = (prefs: ReaderPreferences): void =>
 
 export function hasDirtyDraftFlag(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEYS.dirtyDraft) === '1';
+    return readRawWithLegacyFallback('dirtyDraft') === '1';
   } catch {
     return false;
   }
@@ -104,7 +140,7 @@ export function setDirtyDraftFlag(dirty: boolean): void {
       localStorage.removeItem(STORAGE_KEYS.dirtyDraft);
     }
   } catch {
-    // Ignore
+    // Ignore storage errors
   }
 }
 
@@ -123,7 +159,7 @@ export function clearAllStoredArchive(): void {
       localStorage.removeItem(key);
     }
   } catch {
-    // Ignore
+    // Ignore storage errors
   }
 }
 
@@ -133,8 +169,9 @@ export function buildIndexedSayadaws(
 ): SayadawProfile[] {
   const byId = new Map<string, SayadawProfile>();
   for (const s of managedSayadaws) {
-    byId.set(s.id, s);
+    byId.set(s.id, normalizeSayadawProfile(s));
   }
+
   for (const d of discourses) {
     if (d.sayadawId && !byId.has(d.sayadawId)) {
       byId.set(d.sayadawId, {
@@ -158,11 +195,13 @@ export function mergeDiscourseSources(
   primary: DhammaDiscourse[],
   secondary: DhammaDiscourse[],
 ): DhammaDiscourse[] {
-  const result = [...primary];
-  const seenIds = new Set(primary.map((d) => d.id));
-  const seenSlugs = new Set(primary.map((d) => d.slug).filter(Boolean));
-  const seenRepoPaths = new Set(primary.map((d) => d.repoPath).filter(Boolean));
-  for (const item of secondary) {
+  const result = primary.map(normalizeDiscourseRecord);
+  const seenIds = new Set(result.map((d) => d.id));
+  const seenSlugs = new Set(result.map((d) => d.slug).filter(Boolean));
+  const seenRepoPaths = new Set(result.map((d) => d.repoPath).filter(Boolean));
+
+  for (const rawItem of secondary) {
+    const item = normalizeDiscourseRecord(rawItem);
     if (seenIds.has(item.id)) continue;
     if (item.slug && seenSlugs.has(item.slug)) continue;
     if (item.repoPath && seenRepoPaths.has(item.repoPath)) continue;
@@ -181,7 +220,12 @@ export async function fetchPublishedManifest(): Promise<PublishedContentManifest
     if (!res.ok) return null;
     const data = (await res.json()) as PublishedContentManifest;
     if (!data || !Array.isArray(data.discourses)) return null;
-    return data;
+    return {
+      ...data,
+      discourses: data.discourses.map(normalizeDiscourseRecord),
+      sayadaws: data.sayadaws?.map(normalizeSayadawProfile),
+      customSayadaws: data.customSayadaws?.map(normalizeSayadawProfile),
+    };
   } catch {
     return null;
   }

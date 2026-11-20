@@ -1,6 +1,6 @@
 :root {
-  --font-display: "Cormorant Garamond", "Noto Serif TC", Georgia, serif;
-  --font-body: "Source Serif 4", "Noto Serif TC", Georgia, serif;
+  --font-display: "Cormorant Garamond", "Noto Serif Myanmar", Georgia, serif;
+  --font-body: "Source Serif 4", "Noto Serif Myanmar", Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 
   --surface-canvas: #FBF9F5;

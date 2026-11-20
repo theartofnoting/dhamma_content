@@ -33,7 +33,6 @@ export function SectionHeader({
           </p>
         )}
       </div>
-
       {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
     </div>
   );

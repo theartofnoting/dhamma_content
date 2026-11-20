@@ -1,15 +1,18 @@
-export type TraditionCollection =
-  | 'Abhidhamma'
-  | 'Satipatthana & Vipassana'
-  | 'Sutta Pitaka'
-  | 'Visuddhimagga'
-  | 'Monastic Talks';
+import {
+  DISCOURSE_LANGUAGES,
+  EVENT_STATUSES,
+  EVENT_TYPES,
+  SITE_LOCALES,
+  TIP_CATEGORIES,
+  TRADITION_COLLECTIONS,
+} from '../config/taxonomy';
 
-export type DiscourseLanguage =
-  | 'Pāli · English'
-  | 'Pāli · Vietnamese · English'
-  | 'English'
-  | 'Vietnamese';
+export type SiteLocale = (typeof SITE_LOCALES)[number];
+export type TraditionCollection = (typeof TRADITION_COLLECTIONS)[number];
+export type DiscourseLanguage = (typeof DISCOURSE_LANGUAGES)[number];
+export type TipCategory = (typeof TIP_CATEGORIES)[number];
+export type EventType = (typeof EVENT_TYPES)[number];
+export type EventStatus = (typeof EVENT_STATUSES)[number];
 
 export interface SayadawProfile {
   id: string;
@@ -86,12 +89,6 @@ export interface DhammaDiscourse {
   isUserCreated?: boolean;
 }
 
-export type TipCategory =
-  | 'Breath & Anchor'
-  | 'Posture & Walking'
-  | 'Working with Hindrances'
-  | 'Daily Mindfulness';
-
 export interface MeditationTip {
   id: string;
   title: string;
@@ -105,20 +102,12 @@ export interface MeditationTip {
   isUserCreated?: boolean;
 }
 
-export type EventType =
-  | 'Retreat Course'
-  | 'Group Sitting'
-  | 'Dhamma Talk'
-  | 'Study Circle';
-
-export type EventStatus = 'Registration Open' | 'Waitlist' | 'Drop-In Welcome' | 'Completed';
-
 export interface GroupEvent {
   id: string;
   title: string;
   eventType: EventType;
-  startDate: string; // YYYY-MM-DD
-  endDate: string;   // YYYY-MM-DD
+  startDate: string;
+  endDate: string;
   timeRange: string;
   locationOrLink: string;
   teacher: string;

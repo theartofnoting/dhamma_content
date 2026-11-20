@@ -20,28 +20,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
       - name: Setup Node.js 24
         uses: actions/setup-node@v5
         with:
           node-version: "24"
-
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-
       - name: Build static site for GitHub Pages
         env:
           VITE_BASE_PATH: /dhamma_content/
         run: npm run build
-
       - name: Add SPA fallback for GitHub Pages
         run: cp dist/index.html dist/404.html
-
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
           path: ./dist
-
   deploy:
     environment:
       name: github-pages

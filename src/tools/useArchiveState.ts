@@ -26,6 +26,7 @@ import {
 } from '../content/archiveStore';
 import { loadBundledArticleDiscourses } from '../content/articleLoader';
 import { discourseToMarkdown } from '../content/exporters';
+import { getLocaleDictionary } from '../i18n';
 import {
   AuthSessionState,
   clearPatSession,
@@ -39,6 +40,7 @@ import {
   buildHomePath,
   buildLoginPath,
   buildSayadawPath,
+  buildSwitchedLocalePath,
   parseAppRoute,
   pushBrowserPath,
 } from '../plugins/urlRouter';
@@ -54,6 +56,7 @@ import {
   NavSection,
   ReaderPreferences,
   SayadawProfile,
+  SiteLocale,
   TraditionCollection,
 } from '../types/dhamma';
 
@@ -63,8 +66,7 @@ export function useArchiveState() {
     () => buildIndexedSayadaws([], bundledDiscourses),
     [bundledDiscourses],
   );
-
-  const initialRoute = useMemo(
+  const initialParsed = useMemo(
     () =>
       parseAppRoute(
         typeof window !== 'undefined' ? window.location.pathname : '/',
@@ -74,9 +76,9 @@ export function useArchiveState() {
     [bundledDiscourses, initialSayadaws],
   );
 
+  const [locale, setLocale] = useState<SiteLocale>(initialParsed.locale);
   const [auth, setAuth] = useState<AuthSessionState>(() => loadSavedPatSession());
   const [manifestLoaded, setManifestLoaded] = useState(false);
-
   const [managedSayadaws, setManagedSayadaws] = useState<SayadawProfile[]>(initialSayadaws);
   const [discourses, setDiscourses] = useState<DhammaDiscourse[]>(bundledDiscourses);
   const [deletedPaths, setDeletedPaths] = useState<string[]>([]);
@@ -97,30 +99,30 @@ export function useArchiveState() {
   const [prefs, setPrefs] = useState<ReaderPreferences>(() => loadReaderPrefs());
 
   const [viewMode, setViewMode] = useState<'home' | 'reader' | 'login' | 'not-found'>(() => {
-    if (initialRoute.kind === 'login') return 'login';
-    if (initialRoute.kind === 'discourse') return 'reader';
-    if (initialRoute.kind === 'not-found') return 'not-found';
+    if (initialParsed.route.kind === 'login') return 'login';
+    if (initialParsed.route.kind === 'discourse') return 'reader';
+    if (initialParsed.route.kind === 'not-found') return 'not-found';
     return 'home';
   });
   const [activeNav, setActiveNav] = useState<NavSection>(() => {
-    if (initialRoute.kind === 'login') return 'login';
-    if (initialRoute.kind === 'discourse') return 'reader';
+    if (initialParsed.route.kind === 'login') return 'login';
+    if (initialParsed.route.kind === 'discourse') return 'reader';
     return 'discourses';
   });
   const [activeDiscourseId, setActiveDiscourseId] = useState<string>(() =>
-    initialRoute.kind === 'discourse' ? initialRoute.discourse.id : bundledDiscourses[0]?.id || '',
+    initialParsed.route.kind === 'discourse'
+      ? initialParsed.route.discourse.id
+      : bundledDiscourses[0]?.id || '',
   );
 
-  // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCollection, setSelectedCollection] = useState<TraditionCollection | 'All'>('All');
   const [selectedSayadawId, setSelectedSayadawId] = useState<string>(() =>
-    initialRoute.kind === 'sayadaw' ? initialRoute.sayadawId : 'All',
+    initialParsed.route.kind === 'sayadaw' ? initialParsed.route.sayadawId : 'All',
   );
   const [selectedLanguage, setSelectedLanguage] = useState<DiscourseLanguage | 'All'>('All');
   const [onlySaved, setOnlySaved] = useState(false);
 
-  // Discourse Modal
   const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
   const [editingDiscourse, setEditingDiscourse] = useState<DhammaDiscourse | null>(null);
   const [presetSayadawId, setPresetSayadawId] = useState<string | undefined>(undefined);
@@ -130,7 +132,11 @@ export function useArchiveState() {
     [managedSayadaws, discourses],
   );
 
-  // Hydrate content/archive.json on startup and merge with bundled content/articles files
+  const activeDiscourse = useMemo(
+    () => discourses.find((d) => d.id === activeDiscourseId) || discourses[0],
+    [discourses, activeDiscourseId],
+  );
+
   useEffect(() => {
     let cancelled = false;
 
@@ -178,7 +184,6 @@ export function useArchiveState() {
         setFormTabs(nextTabs);
         setActiveFormTabId(nextTabs[0]?.id || '');
       }
-
       setManifestLoaded(true);
     }
 
@@ -188,55 +193,56 @@ export function useArchiveState() {
     };
   }, [bundledDiscourses]);
 
-  // Re-apply URL route once manifest discourses load
   const initialRouteSyncedRef = useRef(false);
   useEffect(() => {
     if (!manifestLoaded || initialRouteSyncedRef.current) return;
     initialRouteSyncedRef.current = true;
+    const parsed = parseAppRoute(window.location.pathname, discourses, indexedSayadaws);
+    setLocale(parsed.locale);
 
-    const route = parseAppRoute(window.location.pathname, discourses, indexedSayadaws);
-    if (route.kind === 'discourse') {
-      setActiveDiscourseId(route.discourse.id);
+    if (parsed.route.kind === 'discourse') {
+      setActiveDiscourseId(parsed.route.discourse.id);
       setViewMode('reader');
       setActiveNav('reader');
-    } else if (route.kind === 'sayadaw') {
-      setSelectedSayadawId(route.sayadawId);
+    } else if (parsed.route.kind === 'sayadaw') {
+      setSelectedSayadawId(parsed.route.sayadawId);
       setViewMode('home');
       setActiveNav('discourses');
       setTimeout(() => {
         document.getElementById(SECTION_IDS.discourses)?.scrollIntoView({ behavior: 'smooth' });
       }, 60);
-    } else if (route.kind === 'login') {
+    } else if (parsed.route.kind === 'login') {
       setViewMode('login');
       setActiveNav('login');
-    } else if (route.kind === 'not-found') {
+    } else if (parsed.route.kind === 'not-found') {
       setViewMode('not-found');
     }
   }, [manifestLoaded, discourses, indexedSayadaws]);
 
-  // Listen to browser Back / Forward navigation
   useEffect(() => {
     const onPopState = () => {
-      const route = parseAppRoute(window.location.pathname, discourses, indexedSayadaws);
-      if (route.kind === 'home') {
+      const parsed = parseAppRoute(window.location.pathname, discourses, indexedSayadaws);
+      setLocale(parsed.locale);
+
+      if (parsed.route.kind === 'home') {
         setViewMode('home');
         setActiveNav('discourses');
         setSelectedSayadawId('All');
-      } else if (route.kind === 'login') {
+      } else if (parsed.route.kind === 'login') {
         setViewMode('login');
         setActiveNav('login');
-      } else if (route.kind === 'discourse') {
-        setActiveDiscourseId(route.discourse.id);
+      } else if (parsed.route.kind === 'discourse') {
+        setActiveDiscourseId(parsed.route.discourse.id);
         setViewMode('reader');
         setActiveNav('reader');
-      } else if (route.kind === 'sayadaw') {
-        setSelectedSayadawId(route.sayadawId);
+      } else if (parsed.route.kind === 'sayadaw') {
+        setSelectedSayadawId(parsed.route.sayadawId);
         setViewMode('home');
         setActiveNav('discourses');
         setTimeout(() => {
           document.getElementById(SECTION_IDS.discourses)?.scrollIntoView({ behavior: 'smooth' });
         }, 40);
-      } else if (route.kind === 'github') {
+      } else if (parsed.route.kind === 'github') {
         if (auth.isOwner) {
           setViewMode('home');
           setActiveNav('github');
@@ -257,21 +263,27 @@ export function useArchiveState() {
   }, [discourses, indexedSayadaws, auth.isOwner]);
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (prefs.darkMode) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    saveReaderPrefs(prefs);
-  }, [prefs]);
-
-  useEffect(() => {
     saveBookmarks(bookmarks);
   }, [bookmarks]);
 
+  useEffect(() => {
+    saveReaderPrefs(prefs);
+    document.documentElement.classList.toggle('dark', prefs.darkMode);
+  }, [prefs]);
+
+  useEffect(() => {
+    const dict = getLocaleDictionary(locale);
+    document.documentElement.lang = locale;
+
+    if (viewMode === 'reader' && activeDiscourse) {
+      document.title = `${activeDiscourse.title} — ${activeDiscourse.sayadawName} | Vipassana Bhavana`;
+    } else {
+      document.title = dict.meta.pageTitle;
+    }
+  }, [locale, viewMode, activeDiscourse]);
+
   const markOwnerDraftDirty = useCallback(
-    (next: {
+    (overrides: {
       discourses?: DhammaDiscourse[];
       sayadaws?: SayadawProfile[];
       deletedPaths?: string[];
@@ -279,134 +291,169 @@ export function useArchiveState() {
       events?: GroupEvent[];
       formTabs?: GoogleFormTab[];
     }) => {
-      if (next.discourses) saveStoredDiscourses(next.discourses);
-      if (next.sayadaws) saveStoredCustomSayadaws(next.sayadaws);
-      if (next.deletedPaths) saveStoredDeletedPaths(next.deletedPaths);
-      if (next.tips) saveStoredTips(next.tips);
-      if (next.events) saveStoredEvents(next.events);
-      if (next.formTabs) saveStoredFormTabs(next.formTabs);
+      saveStoredDiscourses(overrides.discourses ?? discourses);
+      saveStoredCustomSayadaws(overrides.sayadaws ?? indexedSayadaws);
+      saveStoredDeletedPaths(overrides.deletedPaths ?? deletedPaths);
+      saveStoredTips(overrides.tips ?? tips);
+      saveStoredEvents(overrides.events ?? events);
+      saveStoredFormTabs(overrides.formTabs ?? formTabs);
       setDirtyDraftFlag(true);
       setHasUnpublishedChanges(true);
       setPublishStatus(null);
       setPublishError(null);
     },
+    [discourses, indexedSayadaws, deletedPaths, tips, events, formTabs],
+  );
+
+  const switchLocale = useCallback(
+    (targetLocale: SiteLocale) => {
+      setLocale(targetLocale);
+      if (typeof window !== 'undefined') {
+        const nextPath = buildSwitchedLocalePath(window.location.pathname, targetLocale);
+        pushBrowserPath(nextPath);
+      }
+    },
     [],
   );
 
-  const activeDiscourse = useMemo(
-    () => discourses.find((d) => d.id === activeDiscourseId) || discourses[0],
-    [discourses, activeDiscourseId],
-  );
-
-  const navigate = (target: NavSection) => {
-    if (target === 'login' || (target === 'github' && !auth.isOwner)) {
-      setActiveNav('login');
-      setViewMode('login');
-      pushBrowserPath(buildLoginPath());
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    setActiveNav(target);
-    if (target === 'reader') {
-      if (activeDiscourse) {
-        setViewMode('reader');
-        pushBrowserPath(buildDiscoursePath(activeDiscourse, indexedSayadaws));
+  const navigate = useCallback(
+    (target: NavSection) => {
+      if (target === 'login') {
+        setViewMode('login');
+        setActiveNav('login');
+        pushBrowserPath(buildLoginPath(locale));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
-      target = 'discourses';
+
+      if (target === 'reader') {
+        const targetDiscourse = activeDiscourse || discourses[0];
+        if (targetDiscourse) {
+          setActiveDiscourseId(targetDiscourse.id);
+          setViewMode('reader');
+          setActiveNav('reader');
+          pushBrowserPath(buildDiscoursePath(targetDiscourse, indexedSayadaws, locale));
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          setViewMode('home');
+          setActiveNav('discourses');
+          pushBrowserPath(buildHomePath(locale));
+          setTimeout(() => {
+            document.getElementById(SECTION_IDS.discourses)?.scrollIntoView({ behavior: 'smooth' });
+          }, 40);
+        }
+        return;
+      }
+
+      if (target === 'github' && !auth.isOwner) {
+        setViewMode('login');
+        setActiveNav('login');
+        pushBrowserPath(buildLoginPath(locale));
+        return;
+      }
+
+      const wasNotHome = viewMode !== 'home';
+      setViewMode('home');
+      setActiveNav(target);
+      if (selectedSayadawId === 'All') {
+        pushBrowserPath(buildHomePath(locale));
+      }
+
+      const elementId = SECTION_IDS[target];
+      setTimeout(
+        () => {
+          document.getElementById(elementId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        },
+        wasNotHome ? 60 : 0,
+      );
+    },
+    [activeDiscourse, discourses, indexedSayadaws, auth.isOwner, viewMode, selectedSayadawId, locale],
+  );
+
+  const selectDiscourse = useCallback(
+    (id: string) => {
+      const target = discourses.find((d) => d.id === id);
+      setActiveDiscourseId(id);
+      setViewMode('reader');
+      setActiveNav('reader');
+      if (target) {
+        pushBrowserPath(buildDiscoursePath(target, indexedSayadaws, locale));
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [discourses, indexedSayadaws, locale],
+  );
+
+  const changeSayadawFilter = useCallback(
+    (sayadawId: string) => {
+      setSelectedSayadawId(sayadawId);
+      if (sayadawId === 'All') {
+        pushBrowserPath(buildHomePath(locale));
+      } else {
+        const sSlug = getSayadawSlug(sayadawId, indexedSayadaws);
+        pushBrowserPath(buildSayadawPath(sSlug, locale));
+      }
+    },
+    [indexedSayadaws, locale],
+  );
+
+  const filterBySayadaw = useCallback(
+    (sayadawId: string) => {
+      changeSayadawFilter(sayadawId);
+      setViewMode('home');
       setActiveNav('discourses');
-    }
+      setTimeout(() => {
+        document.getElementById(SECTION_IDS.discourses)?.scrollIntoView({ behavior: 'smooth' });
+      }, 60);
+    },
+    [changeSayadawFilter],
+  );
 
-    setViewMode('home');
-    pushBrowserPath(buildHomePath());
+  const toggleBookmark = useCallback((id: string) => {
+    setBookmarks((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  }, []);
 
-    setTimeout(() => {
-      const sectionId = SECTION_IDS[target as Exclude<NavSection, 'reader' | 'login'>];
-      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 30);
-  };
+  const exportMarkdown = useCallback((d: DhammaDiscourse) => {
+    const md = discourseToMarkdown(d);
+    const filename = `${d.accessionCode.toLowerCase()}-${d.slug || d.id}.md`;
+    triggerFileDownload(filename, md, 'text/markdown;charset=utf-8');
+  }, []);
 
-  const selectDiscourse = (id: string) => {
-    const found = discourses.find((d) => d.id === id) || discourses[0];
-    if (!found) {
-      navigate('discourses');
-      return;
-    }
-    setActiveDiscourseId(found.id);
-    setViewMode('reader');
-    setActiveNav('reader');
-    pushBrowserPath(buildDiscoursePath(found, indexedSayadaws));
-  };
+  const openStoreModal = useCallback(
+    (presetId?: string, discourseToEdit?: DhammaDiscourse) => {
+      if (!auth.isOwner) return;
+      setEditingDiscourse(discourseToEdit || null);
+      setPresetSayadawId(presetId);
+      setIsStoreModalOpen(true);
+    },
+    [auth.isOwner],
+  );
 
-  const changeSayadawFilter = (sayadawId: string) => {
-    setSelectedSayadawId(sayadawId);
-    pushBrowserPath(
-      sayadawId === 'All'
-        ? buildHomePath()
-        : buildSayadawPath(getSayadawSlug(sayadawId, indexedSayadaws)),
-    );
-  };
-
-  const filterBySayadaw = (sayadawId: string) => {
-    setSelectedSayadawId(sayadawId);
-    setSelectedCollection('All');
-    setOnlySaved(false);
-    setViewMode('home');
-    setActiveNav('discourses');
-    pushBrowserPath(
-      sayadawId === 'All'
-        ? buildHomePath()
-        : buildSayadawPath(getSayadawSlug(sayadawId, indexedSayadaws)),
-    );
-    setTimeout(() => {
-      document.getElementById(SECTION_IDS.discourses)?.scrollIntoView({ behavior: 'smooth' });
-    }, 30);
-  };
-
-  const toggleBookmark = (id: string) => {
-    setBookmarks((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
-  };
-
-  const exportMarkdown = (discourse: DhammaDiscourse) => {
-    const md = discourseToMarkdown(discourse);
-    triggerFileDownload(`${discourse.slug || discourse.id}.md`, md, 'text/markdown;charset=utf-8');
-  };
-
-  const openStoreModal = (presetId?: string, editTarget: DhammaDiscourse | null = null) => {
-    if (!auth.isOwner) return;
-    setEditingDiscourse(editTarget);
-    setPresetSayadawId(presetId);
-    setIsStoreModalOpen(true);
-  };
-
-  const closeStoreModal = () => {
+  const closeStoreModal = useCallback(() => {
     setIsStoreModalOpen(false);
     setEditingDiscourse(null);
     setPresetSayadawId(undefined);
-  };
+  }, []);
 
   const saveSayadaw = (sayadaw: SayadawProfile, isEdit: boolean) => {
     if (!auth.isOwner) return;
     const prevSayadaw = isEdit ? indexedSayadaws.find((s) => s.id === sayadaw.id) : undefined;
     const nextSayadaws = isEdit
       ? indexedSayadaws.map((s) => (s.id === sayadaw.id ? sayadaw : s))
-      : [...indexedSayadaws, sayadaw];
+      : [sayadaw, ...indexedSayadaws];
+
     const nextDiscourses = discourses.map((d) =>
       d.sayadawId === sayadaw.id ? { ...d, sayadawName: sayadaw.name } : d,
     );
 
-    let nextDeleted = deletedPaths;
-    if (
-      prevSayadaw?.imageUrl?.startsWith(`${GITHUB_CONFIG.mediaRoot}/`) &&
+    const nextDeleted =
+      prevSayadaw?.imageUrl &&
+      prevSayadaw.imageUrl.startsWith(`${GITHUB_CONFIG.mediaRoot}/`) &&
       prevSayadaw.imageUrl !== sayadaw.imageUrl
-    ) {
-      nextDeleted = Array.from(new Set([...deletedPaths, prevSayadaw.imageUrl]));
-      setDeletedPaths(nextDeleted);
-    }
+        ? Array.from(new Set([...deletedPaths, prevSayadaw.imageUrl]))
+        : deletedPaths;
 
+    setDeletedPaths(nextDeleted);
     setManagedSayadaws(nextSayadaws);
     setDiscourses(nextDiscourses);
     markOwnerDraftDirty({
@@ -423,29 +470,27 @@ export function useArchiveState() {
     const remainingDiscourses = discourses.filter((d) => d.sayadawId !== sayadawId);
     const remainingSayadaws = indexedSayadaws.filter((s) => s.id !== sayadawId);
 
-    const pathsToQueue: string[] = [];
+    const queuedRemovals: string[] = [];
     if (targetSayadaw?.imageUrl?.startsWith(`${GITHUB_CONFIG.mediaRoot}/`)) {
-      pathsToQueue.push(targetSayadaw.imageUrl);
+      queuedRemovals.push(targetSayadaw.imageUrl);
     }
     for (const d of removedDiscourses) {
-      if (d.repoPath?.startsWith('content/')) pathsToQueue.push(d.repoPath);
-      pathsToQueue.push(...collectDiscourseMediaPaths(d));
+      if (d.repoPath?.startsWith('content/')) queuedRemovals.push(d.repoPath);
+      queuedRemovals.push(...collectDiscourseMediaPaths(d));
     }
 
-    const nextDeleted = Array.from(new Set([...deletedPaths, ...pathsToQueue]));
+    const nextDeleted = Array.from(new Set([...deletedPaths, ...queuedRemovals]));
     setDeletedPaths(nextDeleted);
     setManagedSayadaws(remainingSayadaws);
     setDiscourses(remainingDiscourses);
+    setBookmarks((prev) => prev.filter((id) => !removedDiscourses.some((d) => d.id === id)));
+
     if (selectedSayadawId === sayadawId) {
       setSelectedSayadawId('All');
-      pushBrowserPath(buildHomePath());
+      pushBrowserPath(buildHomePath(locale));
     }
     if (removedDiscourses.some((d) => d.id === activeDiscourseId)) {
       setActiveDiscourseId(remainingDiscourses[0]?.id || '');
-      if (viewMode === 'reader') {
-        setViewMode('home');
-        setActiveNav('discourses');
-      }
     }
 
     markOwnerDraftDirty({
@@ -455,20 +500,10 @@ export function useArchiveState() {
     });
   };
 
-  const saveTeaching = (
-    discourse: DhammaDiscourse,
-    isEdit: boolean,
-    newSayadaw?: SayadawProfile,
-  ) => {
+  const saveTeaching = (discourse: DhammaDiscourse, isEdit: boolean, newSayadaw?: SayadawProfile) => {
     if (!auth.isOwner) return;
-    let nextSayadaws = indexedSayadaws;
-    if (newSayadaw) {
-      nextSayadaws = indexedSayadaws.some((s) => s.id === newSayadaw.id)
-        ? indexedSayadaws
-        : [...indexedSayadaws, newSayadaw];
-    }
-
     const prevDiscourse = isEdit ? discourses.find((d) => d.id === discourse.id) : undefined;
+    const nextSayadaws = newSayadaw ? [newSayadaw, ...indexedSayadaws] : indexedSayadaws;
     const nextDiscourses = isEdit
       ? discourses.map((d) => (d.id === discourse.id ? discourse : d))
       : [discourse, ...discourses];
@@ -490,29 +525,28 @@ export function useArchiveState() {
     const nextDeleted = Array.from(
       new Set([...deletedPaths, ...queuedRemovals].filter((p) => p !== discourse.repoPath)),
     );
-
     const updatedSayadawIndex = buildIndexedSayadaws(nextSayadaws, nextDiscourses);
+
     setDeletedPaths(nextDeleted);
     setManagedSayadaws(nextSayadaws);
     setDiscourses(nextDiscourses);
-
     markOwnerDraftDirty({
       discourses: nextDiscourses,
       sayadaws: updatedSayadawIndex,
       deletedPaths: nextDeleted,
     });
+
     closeStoreModal();
     setActiveDiscourseId(discourse.id);
     setViewMode('reader');
     setActiveNav('reader');
-    pushBrowserPath(buildDiscoursePath(discourse, updatedSayadawIndex));
+    pushBrowserPath(buildDiscoursePath(discourse, updatedSayadawIndex, locale));
   };
 
   const deleteDiscourse = (id: string) => {
     if (!auth.isOwner) return;
     const target = discourses.find((d) => d.id === id);
     const remaining = discourses.filter((d) => d.id !== id);
-
     const queued: string[] = [];
     if (target?.repoPath?.startsWith('content/')) queued.push(target.repoPath);
     if (target) queued.push(...collectDiscourseMediaPaths(target));
@@ -526,7 +560,7 @@ export function useArchiveState() {
     if (viewMode === 'reader') {
       setViewMode('home');
       setActiveNav('discourses');
-      pushBrowserPath(buildHomePath());
+      pushBrowserPath(buildHomePath(locale));
     }
 
     markOwnerDraftDirty({
@@ -620,6 +654,7 @@ export function useArchiveState() {
       setActiveFormTabId('');
       setActiveDiscourseId(bundledDiscourses[0]?.id || '');
     }
+
     setSelectedSayadawId('All');
     setSelectedCollection('All');
     setSelectedLanguage('All');
@@ -628,7 +663,7 @@ export function useArchiveState() {
     setHasUnpublishedChanges(false);
     setPublishStatus(null);
     setPublishError(null);
-    pushBrowserPath(buildHomePath());
+    pushBrowserPath(buildHomePath(locale));
   };
 
   const loginWithPat = (token: string, user: GitHubAuthUser) => {
@@ -636,7 +671,7 @@ export function useArchiveState() {
     setAuth({ isOwner: true, mode: 'pat', user, patToken: token });
     setViewMode('home');
     setActiveNav('discourses');
-    pushBrowserPath(buildHomePath());
+    pushBrowserPath(buildHomePath(locale));
   };
 
   const logout = () => {
@@ -646,7 +681,7 @@ export function useArchiveState() {
     if (activeNav === 'github') {
       setActiveNav('discourses');
       setViewMode('home');
-      pushBrowserPath(buildHomePath());
+      pushBrowserPath(buildHomePath(locale));
     }
   };
 
@@ -668,7 +703,6 @@ export function useArchiveState() {
         formTabs,
         onProgress: (step) => setPublishStatus(step),
       });
-
       setDiscourses(result.updatedDiscourses);
       setManagedSayadaws(result.updatedSayadaws);
       setDeletedPaths([]);
@@ -697,6 +731,8 @@ export function useArchiveState() {
   };
 
   return {
+    locale,
+    switchLocale,
     auth,
     viewMode,
     activeNav,

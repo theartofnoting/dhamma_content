@@ -35,7 +35,9 @@ export function EditorModal({
       <div
         className={`relative w-full ${maxWidthClassName} max-h-[92vh] overflow-y-auto bg-[var(--surface-canvas)] border border-[var(--border-strong)] p-6 sm:p-8 shadow-xl`}
       >
-        <div className={`flex items-start justify-between gap-4 pb-4 border-b ${THEME_CLASSES.borderHairline}`}>
+        <div
+          className={`flex items-start justify-between gap-4 pb-4 border-b ${THEME_CLASSES.borderHairline}`}
+        >
           <div className="space-y-1">
             <p className={`font-mono-code text-xs ${THEME_CLASSES.accentInk}`}>{kicker}</p>
             <h3

@@ -6,7 +6,7 @@ import { THEME_CLASSES } from '../theme/uiClasses';
 interface OwnerSessionBarProps {
   auth: AuthSessionState;
   hasUnpublishedChanges: boolean;
-  pendingDeletionCount?: number;
+  pendingDeletionCount: number;
   isPublishing: boolean;
   publishStatus: string | null;
   publishError: string | null;
@@ -19,7 +19,7 @@ interface OwnerSessionBarProps {
 export function OwnerSessionBar({
   auth,
   hasUnpublishedChanges,
-  pendingDeletionCount = 0,
+  pendingDeletionCount,
   isPublishing,
   publishStatus,
   publishError,
@@ -32,12 +32,12 @@ export function OwnerSessionBar({
 
   const statusText = hasUnpublishedChanges
     ? pendingDeletionCount > 0
-      ? `Unpublished edits (${pendingDeletionCount} removal${pendingDeletionCount === 1 ? '' : 's'} queued)`
-      : 'Unpublished edits ready to commit'
+      ? `Unpublished local changes (${pendingDeletionCount} removal(s) queued)`
+      : 'Unpublished local changes ready'
     : 'Synced with repository';
 
   return (
-    <div className={`border-b ${THEME_CLASSES.borderStrong} bg-[var(--surface-muted)]`}>
+    <div className="border-b border-[var(--border-strong)] bg-[var(--surface-muted)]">
       <div className="mx-auto max-w-[1200px] px-4 py-2.5 sm:px-8 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className={`flex flex-wrap items-center gap-2.5 ${THEME_CLASSES.inkPrimary}`}>
           <ShieldCheck className={`h-4 w-4 ${THEME_CLASSES.successInk}`} aria-hidden="true" />
@@ -85,7 +85,6 @@ export function OwnerSessionBar({
             <UploadCloud className="h-3.5 w-3.5" aria-hidden="true" />
             <span>{isPublishing ? 'Publishing...' : 'Publish to GitHub'}</span>
           </button>
-
           <button
             type="button"
             onClick={onOpenGitHubStudio}
@@ -93,7 +92,6 @@ export function OwnerSessionBar({
           >
             Manage &amp; Backup
           </button>
-
           <button
             type="button"
             onClick={onLogout}

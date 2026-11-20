@@ -39,7 +39,7 @@ export function discourseToMarkdown(d: DhammaDiscourse): string {
     '---',
     `accession: "${d.accessionCode}"`,
     `title: "${d.title.replace(/"/g, '\\"')}"`,
-    d.chineseTitle ? `chinese_title: "${d.chineseTitle.replace(/"/g, '\\"')}"` : null,
+    d.vietnameseTitle ? `vietnamese_title: "${d.vietnameseTitle.replace(/"/g, '\\"')}"` : null,
     d.paliSubtitle ? `pali_subtitle: "${d.paliSubtitle.replace(/"/g, '\\"')}"` : null,
     `sayadaw: "${d.sayadawName.replace(/"/g, '\\"')}"`,
     `collection: "${d.collection}"`,
@@ -58,7 +58,7 @@ export function discourseToMarkdown(d: DhammaDiscourse): string {
 
   const header = [
     `# ${d.title}`,
-    d.chineseTitle ? `### ${d.chineseTitle}` : null,
+    d.vietnameseTitle ? `### ${d.vietnameseTitle}` : null,
     d.paliSubtitle ? `*${d.paliSubtitle}*` : null,
     '',
     `> **Sayadaw:** ${d.sayadawName}  `,
@@ -154,28 +154,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
       - name: Setup Node.js 24
         uses: actions/setup-node@v5
         with:
           node-version: "24"
-
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-
       - name: Build static site for GitHub Pages
         env:
           VITE_BASE_PATH: ${GITHUB_CONFIG.pagesBasePath}
         run: npm run build
-
       - name: Add SPA fallback for GitHub Pages
         run: cp dist/index.html dist/404.html
-
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
           path: ./dist
-
   deploy:
     environment:
       name: github-pages
@@ -197,7 +191,7 @@ export function buildArchiveBackupPayload(params: {
   events: GroupEvent[];
 }) {
   return {
-    name: `${SITE_CONFIG.brandTitle} — ${SITE_CONFIG.pageTitleSuffix}`,
+    name: `${SITE_CONFIG.brandTitle} — Dhamma Page`,
     site: GITHUB_CONFIG.pagesUrl,
     repository: `https://github.com/${params.repoSlug}`,
     exportedAt: new Date().toISOString(),

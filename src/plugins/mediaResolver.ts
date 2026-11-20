@@ -7,10 +7,12 @@ export function resolveAssetUrl(rawUrl: string): string {
   if (/^(https?:|data:|blob:)/i.test(trimmed)) {
     return trimmed;
   }
+
   const base = import.meta.env.BASE_URL || '/';
   if (trimmed.startsWith(base) && base !== '/') {
     return trimmed;
   }
+
   const cleaned = trimmed.replace(/^\/+/, '').replace(/^public\//i, '');
   if (cleaned.startsWith('media/')) {
     return `${base}content/${cleaned}`;
@@ -50,6 +52,7 @@ export function resolveMediaSource(
   const trimmed = rawUrl.trim();
   const src = resolveAssetUrl(trimmed);
   const ytId = extractYouTubeId(trimmed);
+
   if (ytId) {
     return {
       kind: 'youtube',
@@ -80,6 +83,7 @@ export function resolveMediaSource(
   ) {
     return { kind: 'image', src };
   }
+
   return { kind: 'link', src };
 }
 
@@ -119,7 +123,7 @@ export function normalizeGoogleFormUrl(input: string): {
     return {
       ok: false,
       error:
-        'Shortened forms.gle links cannot be embedded directly in an iframe. Open the link in a browser tab and copy the full https://docs.google.com/forms/d/e/.../viewform address.',
+        'Shortened forms.gle links cannot be embedded directly in an iframe. Open the link and copy the full https://docs.google.com/forms/d/e/.../viewform address.',
     };
   }
 
@@ -133,7 +137,6 @@ export function normalizeGoogleFormUrl(input: string): {
   if (parsed.pathname.endsWith('/edit')) {
     parsed.pathname = parsed.pathname.replace(/\/edit$/, '/viewform');
   }
-
   parsed.searchParams.set('embedded', 'true');
   return { ok: true, embedUrl: parsed.toString() };
 }

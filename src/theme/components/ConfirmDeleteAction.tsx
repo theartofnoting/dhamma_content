@@ -9,6 +9,7 @@ interface ConfirmDeleteActionProps {
   ariaLabel?: string;
   label?: string;
   confirmLabel?: string;
+  cancelLabel?: string;
   variant?: 'inline' | 'icon' | 'button';
 }
 
@@ -20,6 +21,7 @@ export function ConfirmDeleteAction({
   ariaLabel = 'Delete item',
   label = 'Delete',
   confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
   variant = 'inline',
 }: ConfirmDeleteActionProps) {
   if (isConfirming) {
@@ -37,7 +39,7 @@ export function ConfirmDeleteAction({
           onClick={onCancel}
           className={`min-h-[34px] px-2 ${THEME_CLASSES.inkMuted} hover:text-[var(--ink-primary)] cursor-pointer`}
         >
-          Cancel
+          {cancelLabel}
         </button>
       </span>
     );

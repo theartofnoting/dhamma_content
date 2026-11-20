@@ -1,8 +1,6 @@
 {
-  "name": "Nanda Dhamma Archive",
-  "description": "Digital Dhamma library and GitHub Pages archive for theartofnoting preserving Sayadaw discourses, Pāli Tipiṭaka studies, and Abhidhamma treatises.",
+  "name": "Vipassana Bhavana — Dhamma Page",
+  "description": "Sổ tay lưu trữ Pháp thoại và hướng dẫn thực hành từ các Thiền sư (Sayadaw) và các hoạt động của nhóm Vipassana Bhavana.",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": []
 }

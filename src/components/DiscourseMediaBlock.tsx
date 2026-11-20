@@ -8,12 +8,14 @@ interface DiscourseMediaBlockProps {
   audioReferenceUrl?: string;
   mediaItems?: DiscourseMediaItem[];
   discourseTitle: string;
+  headingLabel?: string;
 }
 
 export function DiscourseMediaBlock({
   audioReferenceUrl,
   mediaItems = [],
   discourseTitle,
+  headingLabel = 'Recordings & Attached Media',
 }: DiscourseMediaBlockProps) {
   const combinedItems: DiscourseMediaItem[] = [
     ...(audioReferenceUrl && audioReferenceUrl.trim()
@@ -27,7 +29,7 @@ export function DiscourseMediaBlock({
                 : resolveMediaSource(audioReferenceUrl).kind === 'audio'
                   ? ('audio' as const)
                   : ('document' as const),
-            title: `${discourseTitle} — Recorded Talk / Primary Media`,
+            title: `${discourseTitle} — Primary Media`,
             url: audioReferenceUrl.trim(),
           },
         ]
@@ -39,15 +41,17 @@ export function DiscourseMediaBlock({
 
   return (
     <section
-      aria-label="Discourse media and recordings"
+      aria-label={headingLabel}
       className={`space-y-5 p-5 sm:p-6 ${THEME_CLASSES.card}`}
     >
-      <div className={`flex items-baseline justify-between gap-4 pb-3 border-b ${THEME_CLASSES.borderHairline}`}>
+      <div
+        className={`flex items-baseline justify-between gap-4 pb-3 border-b ${THEME_CLASSES.borderHairline}`}
+      >
         <h2 className={`text-xs tracking-widest uppercase ${THEME_CLASSES.inkSubtle}`}>
-          Recordings &amp; Attached Media
+          {headingLabel}
         </h2>
         <span className={`font-mono-code text-[11px] ${THEME_CLASSES.inkSubtle} tabular-nums`}>
-          {combinedItems.length} {combinedItems.length === 1 ? 'item' : 'items'}
+          {combinedItems.length}
         </span>
       </div>
 
