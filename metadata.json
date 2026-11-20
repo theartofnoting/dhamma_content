@@ -1,6 +1,6 @@
 {
   "name": "Nanda Dhamma Archive",
-  "description": "Digital Dhamma library and GitHub Pages archive for nanda.online-dhamma.net (twnanda/twnanda), preserving Sayadaw discourses, Pāli Tipiṭaka studies, and Abhidhamma treatises.",
+  "description": "Digital Dhamma library and GitHub Pages archive for theartofnoting preserving Sayadaw discourses, Pāli Tipiṭaka studies, and Abhidhamma treatises.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
