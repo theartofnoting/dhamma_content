@@ -175,10 +175,12 @@ export interface PublishedContentManifest {
   version: number;
   updatedAt: string;
   discourses: DhammaDiscourse[];
-  customSayadaws: SayadawProfile[];
-  tips: MeditationTip[];
-  events: GroupEvent[];
-  formTabs: GoogleFormTab[];
+  sayadaws?: SayadawProfile[];
+  customSayadaws?: SayadawProfile[];
+  deletedPaths?: string[];
+  tips?: MeditationTip[];
+  events?: GroupEvent[];
+  formTabs?: GoogleFormTab[];
 }
 
 export type NavSection =

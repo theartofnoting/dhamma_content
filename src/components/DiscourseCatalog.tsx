@@ -10,6 +10,7 @@ import {
   Plus,
   Search,
   Sun,
+  Trash2,
   X,
 } from 'lucide-react';
 import {
@@ -43,6 +44,7 @@ interface DiscourseCatalogProps {
   onToggleBookmark: (id: string) => void;
   onExportMarkdown: (discourse: DhammaDiscourse) => void;
   onEditDiscourse: (discourse: DhammaDiscourse) => void;
+  onDeleteDiscourse: (id: string) => void;
   onOpenStoreModal: (presetSayadawId?: string) => void;
 }
 
@@ -84,10 +86,12 @@ export function DiscourseCatalog({
   onToggleBookmark,
   onExportMarkdown,
   onEditDiscourse,
+  onDeleteDiscourse,
   onOpenStoreModal,
 }: DiscourseCatalogProps) {
   const [sortByTime, setSortByTime] = useState<'default' | 'shortest' | 'longest'>('default');
   const [groupBySayadaw, setGroupBySayadaw] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const countBySayadaw = useMemo(() => {
     const counts = new Map<string, number>();
@@ -203,6 +207,53 @@ export function DiscourseCatalog({
     if (onlySaved) onToggleOnlySaved();
   };
 
+  const renderOwnerActions = (d: DhammaDiscourse) => {
+    if (!isOwner) return null;
+    if (confirmDeleteId === d.id) {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              onDeleteDiscourse(d.id);
+              setConfirmDeleteId(null);
+            }}
+            className="min-h-[34px] px-2.5 bg-[#9A3412] text-[#FBF9F5] font-medium cursor-pointer whitespace-nowrap"
+          >
+            Confirm
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmDeleteId(null)}
+            className="min-h-[34px] px-2 text-[#57534E] dark:text-[#A8A29E] cursor-pointer"
+          >
+            Cancel
+          </button>
+        </span>
+      );
+    }
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => onEditDiscourse(d)}
+          aria-label={`Edit ${d.title}`}
+          className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirmDeleteId(d.id)}
+          aria-label={`Delete ${d.title}`}
+          className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FCA5A5] cursor-pointer"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </>
+    );
+  };
+
   return (
     <section id="catalog-section" className="mx-auto max-w-[1200px] px-4 py-12 sm:px-8 sm:py-16">
       {/* Section Heading & Theme Switch */}
@@ -277,7 +328,7 @@ export function DiscourseCatalog({
               type="search"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search Pāli titles, Sayadaw, Chinese terms, or Sutta reference (e.g. DN 22)..."
+              placeholder="Search titles, Sayadaw, Chinese terms, or Sutta reference..."
               aria-label="Search Dhamma archive"
               className="w-full min-h-[44px] pl-10 pr-10 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] placeholder:text-[#78716C] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412] dark:focus:border-[#D97757]"
             />
@@ -431,20 +482,20 @@ export function DiscourseCatalog({
       {filtered.length === 0 ? (
         <div className="py-16 text-center space-y-4 border-b border-[#E5DFD3] dark:border-[#342E28]">
           <p className="font-display text-2xl font-medium text-[#1C1917] dark:text-[#F5F5F4]">
-            No matching Sayadaw discourses found
-          </p>
-          <p className="text-sm text-[#57534E] dark:text-[#A8A29E] max-w-md mx-auto">
-            Try clearing your search query or filters, or store a new Sayadaw Dhamma discourse into
-            the archive.
+            {discourses.length === 0
+              ? 'No discourses in the archive yet'
+              : 'No matching Sayadaw discourses found'}
           </p>
           <div className="flex items-center justify-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="min-h-[40px] px-4 py-2 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer"
-            >
-              Reset Filters
-            </button>
+            {discourses.length > 0 && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="min-h-[40px] px-4 py-2 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            )}
             {isOwner && (
               <button
                 type="button"
@@ -453,17 +504,16 @@ export function DiscourseCatalog({
                 }
                 className="min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] cursor-pointer"
               >
-                Store New Teaching
+                Add Discourse
               </button>
             )}
           </div>
         </div>
       ) : (
         <>
-          {/* Tier 1 & Tier 2 Featured Editorial Grid (shown in default catalog view) */}
+          {/* Tier 1 & Tier 2 Featured Editorial Grid */}
           {leadDiscourse && (
             <div className="py-10 border-b border-[#E5DFD3] dark:border-[#342E28] space-y-12">
-              {/* Tier 1: Lead Discourse */}
               <article className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
                 <div className="lg:col-span-6">
                   <ArchivalImage
@@ -564,7 +614,6 @@ export function DiscourseCatalog({
                 </div>
               </article>
 
-              {/* Tier 2: Secondary Editorial Pair */}
               {secondaryDiscourses.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-[#E5DFD3] dark:border-[#342E28]">
                   {secondaryDiscourses.map((d) => (
@@ -654,7 +703,7 @@ export function DiscourseCatalog({
             </div>
           )}
 
-          {/* Tier 3: Complete Archive Catalogue Table / Index Rows */}
+          {/* Tier 3: Complete Archive Catalogue */}
           <div className="pt-10">
             <div className="flex flex-wrap items-baseline justify-between gap-3 pb-4 border-b border-[#1C1917]/20 dark:border-[#E7E5E4]/20">
               <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
@@ -712,7 +761,7 @@ export function DiscourseCatalog({
                               </span>
                             </div>
 
-                            <div className="lg:col-span-6 space-y-1">
+                            <div className="lg:col-span-5 space-y-1">
                               <button
                                 type="button"
                                 onClick={() => onSelectDiscourse(d.id)}
@@ -743,17 +792,8 @@ export function DiscourseCatalog({
                               </p>
                             </div>
 
-                            <div className="lg:col-span-2 flex items-center lg:justify-end gap-2">
-                              {isOwner && (
-                                <button
-                                  type="button"
-                                  onClick={() => onEditDiscourse(d)}
-                                  aria-label={`Edit ${d.title}`}
-                                  className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </button>
-                              )}
+                            <div className="lg:col-span-3 flex items-center lg:justify-end gap-1.5">
+                              {renderOwnerActions(d)}
                               <button
                                 type="button"
                                 onClick={() => onToggleBookmark(d.id)}
@@ -810,14 +850,9 @@ export function DiscourseCatalog({
                         <span className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74] tabular-nums">
                           {d.accessionCode}
                         </span>
-                        {isOwner && d.isUserCreated && (
-                          <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                            · Draft
-                          </span>
-                        )}
                       </div>
 
-                      <div className="lg:col-span-5 space-y-1">
+                      <div className="lg:col-span-4 space-y-1">
                         <button
                           type="button"
                           onClick={() => onSelectDiscourse(d.id)}
@@ -864,17 +899,8 @@ export function DiscourseCatalog({
                         </p>
                       </div>
 
-                      <div className="lg:col-span-2 flex items-center lg:justify-end gap-2">
-                        {isOwner && (
-                          <button
-                            type="button"
-                            onClick={() => onEditDiscourse(d)}
-                            aria-label={`Edit ${d.title}`}
-                            className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        )}
+                      <div className="lg:col-span-3 flex items-center lg:justify-end gap-1.5">
+                        {renderOwnerActions(d)}
                         <button
                           type="button"
                           onClick={() => onToggleBookmark(d.id)}

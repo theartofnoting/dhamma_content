@@ -45,7 +45,164 @@ export function FormsEmbedSection({
     }
   }, [activeTab?.id, isOwner]);
 
-  if (!activeTab) return null;
+  const handleCreateTab = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLabel.trim()) {
+      setNewTabError('Please enter a label for the form tab.');
+      return;
+    }
+
+    const result = normalizeGoogleFormUrl(newUrl);
+    if (!result.ok) {
+      setNewTabError(result.error || 'Invalid Google Form URL.');
+      return;
+    }
+
+    const tab: GoogleFormTab = {
+      id: `form-${Date.now()}`,
+      label: newLabel.trim(),
+      description:
+        newDesc.trim() || 'Community submission form embedded for Vipassana Bhavana participants.',
+      rawUrl: newUrl.trim(),
+      embedUrl: result.embedUrl || '',
+      heightPx: 760,
+    };
+
+    onSaveFormTab(tab, true);
+    onSelectTab(tab.id);
+    setIsNewTabModalOpen(false);
+    setNewLabel('');
+    setNewDesc('');
+    setNewUrl('');
+    setNewTabError(null);
+  };
+
+  if (!activeTab) {
+    return (
+      <section
+        id="forms-section"
+        className="border-t border-[#E5DFD3] dark:border-[#342E28] mx-auto max-w-[1200px] px-4 py-14 sm:px-8 sm:py-16"
+      >
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-[#E5DFD3] dark:border-[#342E28]">
+          <div className="space-y-2 max-w-2xl">
+            <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
+              05. Group Submissions
+            </p>
+            <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] text-balance">
+              Community Registration &amp; Submission Forms
+            </h2>
+          </div>
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => {
+                setNewTabError(null);
+                setIsNewTabModalOpen(true);
+              }}
+              className="inline-flex items-center gap-2 min-h-[42px] px-4 py-2 text-xs font-medium bg-[#1C1917] text-[#FBF9F5] hover:bg-[#9A3412] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#FDBA74] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              <span>Add Form Tab</span>
+            </button>
+          )}
+        </div>
+        <div className="py-12 text-center space-y-3">
+          <p className="font-display text-2xl font-medium text-[#1C1917] dark:text-[#F5F5F4]">
+            No registration forms added yet
+          </p>
+        </div>
+        {isOwner && isNewTabModalOpen && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-form-tab-heading"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#1C1917]/60 backdrop-blur-[2px] p-4"
+          >
+            <div className="w-full max-w-lg bg-[#FBF9F5] dark:bg-[#181512] border border-[#D6CEBE] dark:border-[#342E28] p-6 sm:p-8 shadow-xl">
+              <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#E5DFD3] dark:border-[#342E28]">
+                <h3
+                  id="new-form-tab-heading"
+                  className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]"
+                >
+                  Add Google Form Tab
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsNewTabModalOpen(false)}
+                  aria-label="Close modal"
+                  className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] hover:text-[#1C1917] cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <form onSubmit={handleCreateTab} className="pt-5 space-y-4">
+                {newTabError && (
+                  <div
+                    role="alert"
+                    className="p-3 border border-[#9A3412]/50 bg-[#9A3412]/5 text-xs text-[#9A3412] dark:text-[#FCA5A5]"
+                  >
+                    {newTabError}
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                    Tab Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    placeholder="e.g., 10-Day Retreat Intake"
+                    className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                    Description
+                  </label>
+                  <input
+                    type="text"
+                    value={newDesc}
+                    onChange={(e) => setNewDesc(e.target.value)}
+                    placeholder="Purpose of this form for practitioners..."
+                    className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
+                    Google Form URL (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newUrl}
+                    onChange={(e) => setNewUrl(e.target.value)}
+                    placeholder="https://docs.google.com/forms/d/e/.../viewform"
+                    className="w-full min-h-[42px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                  />
+                </div>
+                <div className="pt-4 border-t border-[#E5DFD3] dark:border-[#342E28] flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsNewTabModalOpen(false)}
+                    className="min-h-[42px] px-4 py-2 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="min-h-[42px] px-5 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] cursor-pointer"
+                  >
+                    Create Form Tab
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  }
 
   const handleApplyUrl = (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,38 +246,6 @@ export function FormsEmbedSection({
     onSaveFormTab({ ...activeTab, heightPx }, false);
   };
 
-  const handleCreateTab = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newLabel.trim()) {
-      setNewTabError('Please enter a label for the form tab.');
-      return;
-    }
-
-    const result = normalizeGoogleFormUrl(newUrl);
-    if (!result.ok) {
-      setNewTabError(result.error || 'Invalid Google Form URL.');
-      return;
-    }
-
-    const tab: GoogleFormTab = {
-      id: `form-${Date.now()}`,
-      label: newLabel.trim(),
-      description:
-        newDesc.trim() || 'Community submission form embedded for Vipassana Bhavana participants.',
-      rawUrl: newUrl.trim(),
-      embedUrl: result.embedUrl || '',
-      heightPx: 760,
-    };
-
-    onSaveFormTab(tab, true);
-    onSelectTab(tab.id);
-    setIsNewTabModalOpen(false);
-    setNewLabel('');
-    setNewDesc('');
-    setNewUrl('');
-    setNewTabError(null);
-  };
-
   return (
     <section
       id="forms-section"
@@ -136,7 +261,7 @@ export function FormsEmbedSection({
           </h2>
           <p className="text-sm sm:text-base leading-relaxed text-[#57534E] dark:text-[#A8A29E]">
             {isOwner
-              ? 'Paste any Google Form URL into a tab below to embed live registration, Sayadaw Q&A, or volunteer forms directly on the Dhamma Page.'
+              ? 'Configure Google Form URLs below to embed live registration, Sayadaw Q&A, or volunteer forms.'
               : 'Submit retreat registrations, Sayadaw Dhamma questions, or group volunteer sign-ups using the official forms below.'}
           </p>
         </div>
@@ -191,39 +316,35 @@ export function FormsEmbedSection({
               <span>{showConfigBar ? 'Hide Form URL' : 'Configure Form URL'}</span>
             </button>
 
-            {formTabs.length > 1 && (
-              <>
-                {confirmDeleteTabId !== activeTab.id ? (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDeleteTabId(activeTab.id)}
-                    className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#57534E] hover:text-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>Remove Tab</span>
-                  </button>
-                ) : (
-                  <span className="inline-flex items-center gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onDeleteFormTab(activeTab.id);
-                        setConfirmDeleteTabId(null);
-                      }}
-                      className="min-h-[38px] px-3 bg-[#9A3412] text-[#FBF9F5] cursor-pointer"
-                    >
-                      Confirm Remove
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteTabId(null)}
-                      className="px-2 text-[#57534E] cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </span>
-                )}
-              </>
+            {confirmDeleteTabId !== activeTab.id ? (
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteTabId(activeTab.id)}
+                className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#57534E] hover:text-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Remove Tab</span>
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDeleteFormTab(activeTab.id);
+                    setConfirmDeleteTabId(null);
+                  }}
+                  className="min-h-[38px] px-3 bg-[#9A3412] text-[#FBF9F5] cursor-pointer"
+                >
+                  Confirm Remove
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteTabId(null)}
+                  className="px-2 text-[#57534E] cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </span>
             )}
           </div>
         )}
@@ -334,13 +455,6 @@ export function FormsEmbedSection({
                 Form URL saved to this tab.
               </p>
             )}
-
-            <p className="text-xs text-[#78716C] dark:text-[#A8A29E] leading-relaxed">
-              Tip: In Google Forms, click <strong>Send</strong> → choose the{' '}
-              <strong>Embed HTML (&lt; &gt;)</strong> or <strong>Link</strong> tab, copy the full{' '}
-              <span className="font-mono-code">https://docs.google.com/forms/d/e/.../viewform</span>{' '}
-              URL (or paste the entire &lt;iframe&gt; snippet), and save.
-            </p>
           </form>
         )}
 

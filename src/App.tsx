@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { INITIAL_DISCOURSES, SAYADAW_PROFILES } from './data/dhammaSeed';
 import {
   INITIAL_FORM_TABS,
   INITIAL_GROUP_EVENTS,
@@ -24,6 +23,7 @@ import {
   loadBookmarks,
   loadReaderPrefs,
   loadStoredCustomSayadaws,
+  loadStoredDeletedPaths,
   loadStoredDiscourses,
   loadStoredEvents,
   loadStoredFormTabs,
@@ -31,6 +31,7 @@ import {
   saveBookmarks,
   saveReaderPrefs,
   saveStoredCustomSayadaws,
+  saveStoredDeletedPaths,
   saveStoredDiscourses,
   saveStoredEvents,
   saveStoredFormTabs,
@@ -41,6 +42,7 @@ import { loadBundledArticleDiscourses } from './utils/articleLoader';
 import {
   AuthSessionState,
   clearPatSession,
+  collectDiscourseMediaPaths,
   fetchPublishedManifest,
   loadSavedPatSession,
   publishArchiveToGitHub,
@@ -68,7 +70,7 @@ import { StoreTeachingModal } from './components/StoreTeachingModal';
 import { LoginPage } from './components/LoginPage';
 import { Footer } from './components/Footer';
 
-const BUNDLED_ARTICLE_DISCOURSES = loadBundledArticleDiscourses(SAYADAW_PROFILES);
+const DRAFT_DIRTY_KEY = 'vipassana_bhavana_dirty_draft_v1';
 
 function mergeDiscourseSources(
   primary: DhammaDiscourse[],
@@ -77,18 +79,18 @@ function mergeDiscourseSources(
   const result = [...primary];
   const seenIds = new Set(primary.map((d) => d.id));
   const seenSlugs = new Set(primary.map((d) => d.slug).filter(Boolean));
+  const seenRepoPaths = new Set(primary.map((d) => d.repoPath).filter(Boolean));
   for (const item of secondary) {
     if (seenIds.has(item.id)) continue;
     if (item.slug && seenSlugs.has(item.slug)) continue;
+    if (item.repoPath && seenRepoPaths.has(item.repoPath)) continue;
     result.push(item);
     seenIds.add(item.id);
     if (item.slug) seenSlugs.add(item.slug);
+    if (item.repoPath) seenRepoPaths.add(item.repoPath);
   }
   return result;
 }
-
-const BASE_DISCOURSES = mergeDiscourseSources(INITIAL_DISCOURSES, BUNDLED_ARTICLE_DISCOURSES);
-const DRAFT_DIRTY_KEY = 'vipassana_bhavana_dirty_draft_v1';
 
 function pushBrowserPath(targetPath: string) {
   if (typeof window === 'undefined') return;
@@ -98,25 +100,32 @@ function pushBrowserPath(targetPath: string) {
 }
 
 export default function App() {
+  const bundledDiscourses = useMemo(() => loadBundledArticleDiscourses([]), []);
+  const initialSayadaws = useMemo(
+    () => buildIndexedSayadaws([], [], bundledDiscourses),
+    [bundledDiscourses],
+  );
+
   const initialRoute = useMemo(
     () =>
       parseAppRoute(
         typeof window !== 'undefined' ? window.location.pathname : '/',
-        BASE_DISCOURSES,
-        SAYADAW_PROFILES,
+        bundledDiscourses,
+        initialSayadaws,
       ),
-    [],
+    [bundledDiscourses, initialSayadaws],
   );
 
   const [auth, setAuth] = useState<AuthSessionState>(() => loadSavedPatSession());
   const [manifestLoaded, setManifestLoaded] = useState(false);
 
-  const [discourses, setDiscourses] = useState<DhammaDiscourse[]>(BASE_DISCOURSES);
-  const [customSayadaws, setCustomSayadaws] = useState<SayadawProfile[]>([]);
+  const [managedSayadaws, setManagedSayadaws] = useState<SayadawProfile[]>(initialSayadaws);
+  const [discourses, setDiscourses] = useState<DhammaDiscourse[]>(bundledDiscourses);
+  const [deletedPaths, setDeletedPaths] = useState<string[]>([]);
   const [tips, setTips] = useState<MeditationTip[]>(INITIAL_MEDITATION_TIPS);
   const [events, setEvents] = useState<GroupEvent[]>(INITIAL_GROUP_EVENTS);
   const [formTabs, setFormTabs] = useState<GoogleFormTab[]>(INITIAL_FORM_TABS);
-  const [activeFormTabId, setActiveFormTabId] = useState<string>(INITIAL_FORM_TABS[0].id);
+  const [activeFormTabId, setActiveFormTabId] = useState<string>(INITIAL_FORM_TABS[0]?.id || '');
 
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState<boolean>(() => {
     try {
@@ -145,7 +154,7 @@ export default function App() {
     return 'discourses';
   });
   const [activeDiscourseId, setActiveDiscourseId] = useState<string>(() =>
-    initialRoute.kind === 'discourse' ? initialRoute.discourse.id : BASE_DISCOURSES[0].id,
+    initialRoute.kind === 'discourse' ? initialRoute.discourse.id : bundledDiscourses[0]?.id || '',
   );
 
   // Filters
@@ -163,38 +172,16 @@ export default function App() {
   const [presetSayadawId, setPresetSayadawId] = useState<string | undefined>(undefined);
 
   const indexedSayadaws = useMemo(
-    () => buildIndexedSayadaws(SAYADAW_PROFILES, customSayadaws, discourses),
-    [customSayadaws, discourses],
+    () => buildIndexedSayadaws([], managedSayadaws, discourses),
+    [managedSayadaws, discourses],
   );
 
-  // Check server-side OAuth session + hydrate published manifest on startup
+  // Hydrate content/archive.json on startup and merge with bundled content/articles files
   useEffect(() => {
     let cancelled = false;
 
     async function hydrateStartup() {
-      // 1. Check Express server OAuth session (silent no-op on static GitHub Pages)
-      let serverOwner = false;
-      try {
-        const res = await fetch('/api/auth/me');
-        const ct = res.headers.get('content-type') || '';
-        if (res.ok && ct.includes('application/json')) {
-          const data = (await res.json()) as {
-            authenticated: boolean;
-            isOwner: boolean;
-            user: GitHubAuthUser | null;
-          };
-          if (!cancelled && data.authenticated && data.isOwner && data.user) {
-            serverOwner = true;
-            setAuth({ isOwner: true, mode: 'oauth', user: data.user });
-          }
-        }
-      } catch {
-        // Expected on static GitHub Pages
-      }
-
-      const ownerActive = serverOwner || loadSavedPatSession().isOwner;
-
-      // 2. Fetch published public/data/dhamma-content.json from repository if present
+      const ownerActive = loadSavedPatSession().isOwner;
       const manifest = await fetchPublishedManifest();
       if (cancelled) return;
 
@@ -207,26 +194,43 @@ export default function App() {
       })();
 
       if (ownerActive && hasDirtyDrafts) {
-        const storedD = loadStoredDiscourses(BASE_DISCOURSES);
-        setDiscourses(mergeDiscourseSources(storedD, BUNDLED_ARTICLE_DISCOURSES));
-        setCustomSayadaws(loadStoredCustomSayadaws());
+        const storedDeleted = loadStoredDeletedPaths();
+        const deletedSet = new Set(storedDeleted);
+        const storedS = loadStoredCustomSayadaws();
+        const storedD = loadStoredDiscourses(bundledDiscourses);
+        const activeBundled = loadBundledArticleDiscourses(storedS).filter(
+          (b) => !deletedSet.has(b.repoPath),
+        );
+
+        setDeletedPaths(storedDeleted);
+        setManagedSayadaws(storedS);
+        setDiscourses(mergeDiscourseSources(storedD, activeBundled));
         setTips(loadStoredTips(INITIAL_MEDITATION_TIPS));
         setEvents(loadStoredEvents(INITIAL_GROUP_EVENTS));
         const storedTabs = loadStoredFormTabs(INITIAL_FORM_TABS);
         setFormTabs(storedTabs);
         if (storedTabs[0]) setActiveFormTabId(storedTabs[0].id);
       } else if (manifest) {
-        const mergedManifestDiscourses = mergeDiscourseSources(
-          manifest.discourses,
-          BASE_DISCOURSES,
+        const manifestDeleted = Array.isArray(manifest.deletedPaths) ? manifest.deletedPaths : [];
+        const deletedSet = new Set(manifestDeleted);
+        const manifestSayadaws = Array.isArray(manifest.sayadaws)
+          ? manifest.sayadaws
+          : Array.isArray(manifest.customSayadaws)
+            ? manifest.customSayadaws
+            : [];
+        const activeBundled = loadBundledArticleDiscourses(manifestSayadaws).filter(
+          (b) => !deletedSet.has(b.repoPath),
         );
+        const mergedManifestDiscourses = mergeDiscourseSources(manifest.discourses, activeBundled);
+
+        setDeletedPaths(manifestDeleted);
         setDiscourses(mergedManifestDiscourses);
-        if (Array.isArray(manifest.customSayadaws)) setCustomSayadaws(manifest.customSayadaws);
+        setManagedSayadaws(manifestSayadaws);
         if (Array.isArray(manifest.tips)) setTips(manifest.tips);
         if (Array.isArray(manifest.events)) setEvents(manifest.events);
-        if (Array.isArray(manifest.formTabs) && manifest.formTabs.length > 0) {
+        if (Array.isArray(manifest.formTabs)) {
           setFormTabs(manifest.formTabs);
-          setActiveFormTabId(manifest.formTabs[0].id);
+          setActiveFormTabId(manifest.formTabs[0]?.id || '');
         }
       }
 
@@ -237,9 +241,9 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [bundledDiscourses]);
 
-  // Re-apply URL route once manifest discourses load (important for newly published articles)
+  // Re-apply URL route once manifest discourses load
   const initialRouteSyncedRef = useRef(false);
   useEffect(() => {
     if (!manifestLoaded || initialRouteSyncedRef.current) return;
@@ -324,13 +328,15 @@ export default function App() {
   const markOwnerDraftDirty = useCallback(
     (next: {
       discourses?: DhammaDiscourse[];
-      customSayadaws?: SayadawProfile[];
+      sayadaws?: SayadawProfile[];
+      deletedPaths?: string[];
       tips?: MeditationTip[];
       events?: GroupEvent[];
       formTabs?: GoogleFormTab[];
     }) => {
       if (next.discourses) saveStoredDiscourses(next.discourses);
-      if (next.customSayadaws) saveStoredCustomSayadaws(next.customSayadaws);
+      if (next.sayadaws) saveStoredCustomSayadaws(next.sayadaws);
+      if (next.deletedPaths) saveStoredDeletedPaths(next.deletedPaths);
       if (next.tips) saveStoredTips(next.tips);
       if (next.events) saveStoredEvents(next.events);
       if (next.formTabs) saveStoredFormTabs(next.formTabs);
@@ -346,8 +352,10 @@ export default function App() {
     [],
   );
 
-  const activeDiscourse =
-    discourses.find((d) => d.id === activeDiscourseId) || discourses[0] || BASE_DISCOURSES[0];
+  const activeDiscourse = useMemo(
+    () => discourses.find((d) => d.id === activeDiscourseId) || discourses[0],
+    [discourses, activeDiscourseId],
+  );
 
   const handleNavigate = (target: NavSection) => {
     if (target === 'login') {
@@ -367,9 +375,13 @@ export default function App() {
 
     setActiveNav(target);
     if (target === 'reader') {
-      setViewMode('reader');
-      pushBrowserPath(buildDiscoursePath(activeDiscourse, indexedSayadaws));
-      return;
+      if (activeDiscourse) {
+        setViewMode('reader');
+        pushBrowserPath(buildDiscoursePath(activeDiscourse, indexedSayadaws));
+        return;
+      }
+      target = 'discourses';
+      setActiveNav('discourses');
     }
 
     setViewMode('home');
@@ -385,7 +397,7 @@ export default function App() {
     };
 
     setTimeout(() => {
-      const el = document.getElementById(sectionMap[target]);
+      const el = document.getElementById(sectionMap[target as Exclude<NavSection, 'reader' | 'login'>]);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -394,6 +406,10 @@ export default function App() {
 
   const handleSelectDiscourse = (id: string) => {
     const found = discourses.find((d) => d.id === id) || discourses[0];
+    if (!found) {
+      handleNavigate('discourses');
+      return;
+    }
     setActiveDiscourseId(found.id);
     setViewMode('reader');
     setActiveNav('reader');
@@ -417,7 +433,7 @@ export default function App() {
 
   const handleExportMarkdown = (discourse: DhammaDiscourse) => {
     const md = discourseToMarkdown(discourse);
-    const filename = discourse.repoPath.split('/').pop() || `${discourse.id}.md`;
+    const filename = `${discourse.slug || discourse.id}.md`;
     triggerFileDownload(filename, md, 'text/markdown;charset=utf-8');
   };
 
@@ -437,33 +453,124 @@ export default function App() {
     }, 30);
   };
 
-  // Owner-gated mutation handlers
+  // Owner-gated Sayadaw CRUD
+  const handleSaveSayadaw = (sayadaw: SayadawProfile, isEdit: boolean) => {
+    if (!auth.isOwner) return;
+    const prevSayadaw = isEdit ? indexedSayadaws.find((s) => s.id === sayadaw.id) : undefined;
+    const nextSayadaws = isEdit
+      ? indexedSayadaws.map((s) => (s.id === sayadaw.id ? sayadaw : s))
+      : [...indexedSayadaws, sayadaw];
+
+    // Sync sayadawName across existing discourses under this Sayadaw
+    const nextDiscourses = discourses.map((d) =>
+      d.sayadawId === sayadaw.id ? { ...d, sayadawName: sayadaw.name } : d,
+    );
+
+    let nextDeleted = deletedPaths;
+    if (
+      prevSayadaw?.imageUrl?.startsWith('content/media/') &&
+      prevSayadaw.imageUrl !== sayadaw.imageUrl
+    ) {
+      nextDeleted = Array.from(new Set([...deletedPaths, prevSayadaw.imageUrl]));
+      setDeletedPaths(nextDeleted);
+    }
+
+    setManagedSayadaws(nextSayadaws);
+    setDiscourses(nextDiscourses);
+    markOwnerDraftDirty({
+      sayadaws: nextSayadaws,
+      discourses: nextDiscourses,
+      deletedPaths: nextDeleted,
+    });
+  };
+
+  const handleDeleteSayadaw = (sayadawId: string) => {
+    if (!auth.isOwner) return;
+    const targetSayadaw = indexedSayadaws.find((s) => s.id === sayadawId);
+    const removedDiscourses = discourses.filter((d) => d.sayadawId === sayadawId);
+    const remainingDiscourses = discourses.filter((d) => d.sayadawId !== sayadawId);
+    const remainingSayadaws = indexedSayadaws.filter((s) => s.id !== sayadawId);
+
+    const pathsToQueue: string[] = [];
+    if (targetSayadaw?.imageUrl?.startsWith('content/media/')) {
+      pathsToQueue.push(targetSayadaw.imageUrl);
+    }
+    for (const d of removedDiscourses) {
+      if (d.repoPath?.startsWith('content/')) pathsToQueue.push(d.repoPath);
+      pathsToQueue.push(...collectDiscourseMediaPaths(d));
+    }
+
+    const nextDeleted = Array.from(new Set([...deletedPaths, ...pathsToQueue]));
+    setDeletedPaths(nextDeleted);
+    setManagedSayadaws(remainingSayadaws);
+    setDiscourses(remainingDiscourses);
+    if (selectedSayadawId === sayadawId) {
+      setSelectedSayadawId('All');
+      pushBrowserPath(buildHomePath());
+    }
+    if (removedDiscourses.some((d) => d.id === activeDiscourseId)) {
+      setActiveDiscourseId(remainingDiscourses[0]?.id || '');
+      if (viewMode === 'reader') {
+        setViewMode('home');
+        setActiveNav('discourses');
+      }
+    }
+
+    markOwnerDraftDirty({
+      sayadaws: remainingSayadaws,
+      discourses: remainingDiscourses,
+      deletedPaths: nextDeleted,
+    });
+  };
+
+  // Owner-gated Discourse CRUD
   const handleSaveTeaching = (
     discourse: DhammaDiscourse,
     isEdit: boolean,
     newSayadaw?: SayadawProfile,
   ) => {
     if (!auth.isOwner) return;
-    let nextSayadaws = customSayadaws;
+    let nextSayadaws = indexedSayadaws;
     if (newSayadaw) {
-      nextSayadaws = customSayadaws.some((s) => s.id === newSayadaw.id)
-        ? customSayadaws
-        : [...customSayadaws, newSayadaw];
-      setCustomSayadaws(nextSayadaws);
+      nextSayadaws = indexedSayadaws.some((s) => s.id === newSayadaw.id)
+        ? indexedSayadaws
+        : [...indexedSayadaws, newSayadaw];
     }
 
+    const prevDiscourse = isEdit ? discourses.find((d) => d.id === discourse.id) : undefined;
     const nextDiscourses = isEdit
       ? discourses.map((d) => (d.id === discourse.id ? discourse : d))
       : [discourse, ...discourses];
-    setDiscourses(nextDiscourses);
 
-    const updatedSayadawIndex = buildIndexedSayadaws(
-      SAYADAW_PROFILES,
-      nextSayadaws,
-      nextDiscourses,
+    const queuedRemovals: string[] = [];
+    if (
+      prevDiscourse?.repoPath?.startsWith('content/') &&
+      prevDiscourse.repoPath !== discourse.repoPath
+    ) {
+      queuedRemovals.push(prevDiscourse.repoPath);
+    }
+    if (prevDiscourse) {
+      const nextMedia = new Set(collectDiscourseMediaPaths(discourse));
+      for (const oldMedia of collectDiscourseMediaPaths(prevDiscourse)) {
+        if (!nextMedia.has(oldMedia)) queuedRemovals.push(oldMedia);
+      }
+    }
+
+    const nextDeleted = Array.from(
+      new Set([...deletedPaths, ...queuedRemovals].filter((p) => p !== discourse.repoPath)),
     );
 
-    markOwnerDraftDirty({ discourses: nextDiscourses, customSayadaws: nextSayadaws });
+    setDeletedPaths(nextDeleted);
+    setManagedSayadaws(nextSayadaws);
+    setDiscourses(nextDiscourses);
+
+    const updatedSayadawIndex = buildIndexedSayadaws([], nextSayadaws, nextDiscourses);
+
+    markOwnerDraftDirty({
+      discourses: nextDiscourses,
+      sayadaws: updatedSayadawIndex,
+      deletedPaths: nextDeleted,
+    });
     setIsStoreModalOpen(false);
     setEditingDiscourse(null);
     setPresetSayadawId(undefined);
@@ -475,15 +582,29 @@ export default function App() {
 
   const handleDeleteDiscourse = (id: string) => {
     if (!auth.isOwner) return;
+    const target = discourses.find((d) => d.id === id);
     const remaining = discourses.filter((d) => d.id !== id);
-    const nextList = remaining.length > 0 ? remaining : BASE_DISCOURSES;
-    setDiscourses(nextList);
+
+    const queued: string[] = [];
+    if (target?.repoPath?.startsWith('content/')) queued.push(target.repoPath);
+    if (target) queued.push(...collectDiscourseMediaPaths(target));
+
+    const nextDeleted = Array.from(new Set([...deletedPaths, ...queued]));
+    setDeletedPaths(nextDeleted);
+    setDiscourses(remaining);
     setBookmarks((prev) => prev.filter((b) => b !== id));
-    setActiveDiscourseId(nextList[0].id);
-    setViewMode('home');
-    setActiveNav('discourses');
-    pushBrowserPath(buildHomePath());
-    markOwnerDraftDirty({ discourses: nextList });
+    setActiveDiscourseId(remaining[0]?.id || '');
+
+    if (viewMode === 'reader') {
+      setViewMode('home');
+      setActiveNav('discourses');
+      pushBrowserPath(buildHomePath());
+    }
+
+    markOwnerDraftDirty({
+      discourses: remaining,
+      deletedPaths: nextDeleted,
+    });
   };
 
   const handleSaveTip = (tip: MeditationTip, isEdit: boolean) => {
@@ -533,15 +654,14 @@ export default function App() {
   const handleDeleteFormTab = (id: string) => {
     if (!auth.isOwner) return;
     const remaining = formTabs.filter((t) => t.id !== id);
-    if (remaining.length === 0) return;
     setFormTabs(remaining);
     if (activeFormTabId === id) {
-      setActiveFormTabId(remaining[0].id);
+      setActiveFormTabId(remaining[0]?.id || '');
     }
     markOwnerDraftDirty({ formTabs: remaining });
   };
 
-  const handleResetArchive = () => {
+  const handleResetArchive = async () => {
     if (!auth.isOwner) return;
     clearAllStoredArchive();
     try {
@@ -549,13 +669,35 @@ export default function App() {
     } catch {
       // Ignore
     }
-    setDiscourses(BASE_DISCOURSES);
-    setCustomSayadaws([]);
-    setTips(INITIAL_MEDITATION_TIPS);
-    setEvents(INITIAL_GROUP_EVENTS);
-    setFormTabs(INITIAL_FORM_TABS);
-    setActiveFormTabId(INITIAL_FORM_TABS[0].id);
-    setActiveDiscourseId(BASE_DISCOURSES[0].id);
+    const manifest = await fetchPublishedManifest();
+    if (manifest) {
+      const mDeleted = Array.isArray(manifest.deletedPaths) ? manifest.deletedPaths : [];
+      const deletedSet = new Set(mDeleted);
+      const mSayadaws = Array.isArray(manifest.sayadaws)
+        ? manifest.sayadaws
+        : manifest.customSayadaws || [];
+      const activeBundled = loadBundledArticleDiscourses(mSayadaws).filter(
+        (b) => !deletedSet.has(b.repoPath),
+      );
+      const merged = mergeDiscourseSources(manifest.discourses, activeBundled);
+      setDeletedPaths(mDeleted);
+      setManagedSayadaws(mSayadaws);
+      setDiscourses(merged);
+      setTips(manifest.tips || INITIAL_MEDITATION_TIPS);
+      setEvents(manifest.events || INITIAL_GROUP_EVENTS);
+      setFormTabs(manifest.formTabs || INITIAL_FORM_TABS);
+      setActiveFormTabId(manifest.formTabs?.[0]?.id || '');
+      setActiveDiscourseId(merged[0]?.id || '');
+    } else {
+      setDeletedPaths([]);
+      setManagedSayadaws(initialSayadaws);
+      setDiscourses(bundledDiscourses);
+      setTips(INITIAL_MEDITATION_TIPS);
+      setEvents(INITIAL_GROUP_EVENTS);
+      setFormTabs(INITIAL_FORM_TABS);
+      setActiveFormTabId(INITIAL_FORM_TABS[0]?.id || '');
+      setActiveDiscourseId(bundledDiscourses[0]?.id || '');
+    }
     setSelectedSayadawId('All');
     setSelectedCollection('All');
     setSelectedLanguage('All');
@@ -567,13 +709,6 @@ export default function App() {
     pushBrowserPath(buildHomePath());
   };
 
-  const handleOAuthSuccess = (user: GitHubAuthUser) => {
-    setAuth({ isOwner: true, mode: 'oauth', user });
-    setViewMode('home');
-    setActiveNav('discourses');
-    pushBrowserPath(buildHomePath());
-  };
-
   const handlePatSuccess = (token: string, user: GitHubAuthUser) => {
     savePatSession(token, user);
     setAuth({ isOwner: true, mode: 'pat', user, patToken: token });
@@ -582,13 +717,8 @@ export default function App() {
     pushBrowserPath(buildHomePath());
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     clearPatSession();
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } catch {
-      // Ignore on static GitHub Pages
-    }
     setAuth({ isOwner: false, mode: 'none', user: null });
     setIsStoreModalOpen(false);
     if (activeNav === 'github') {
@@ -610,7 +740,7 @@ export default function App() {
         auth,
         discourses,
         sayadaws: indexedSayadaws,
-        customSayadaws,
+        deletedPaths,
         tips,
         events,
         formTabs,
@@ -618,8 +748,11 @@ export default function App() {
       });
 
       setDiscourses(result.updatedDiscourses);
+      setManagedSayadaws(result.updatedSayadaws);
+      setDeletedPaths([]);
       saveStoredDiscourses(result.updatedDiscourses);
-      saveStoredCustomSayadaws(customSayadaws);
+      saveStoredCustomSayadaws(result.updatedSayadaws);
+      saveStoredDeletedPaths([]);
       saveStoredTips(tips);
       saveStoredEvents(events);
       saveStoredFormTabs(formTabs);
@@ -630,8 +763,10 @@ export default function App() {
       }
       setHasUnpublishedChanges(false);
       setLastActionsUrl(result.repoActionsUrl);
+      const delMsg =
+        result.deletedFiles.length > 0 ? ` and removed ${result.deletedFiles.length} file(s)` : '';
       setPublishStatus(
-        `Committed ${result.committedFiles.length} file(s) to theartofnoting/dhamma_content.`,
+        `Committed ${result.committedFiles.length} file(s)${delMsg} to theartofnoting/dhamma_content.`,
       );
     } catch (err) {
       setPublishStatus(null);
@@ -661,6 +796,7 @@ export default function App() {
         <OwnerSessionBar
           auth={auth}
           hasUnpublishedChanges={hasUnpublishedChanges}
+          pendingDeletionCount={deletedPaths.length}
           isPublishing={isPublishing}
           publishStatus={publishStatus}
           publishError={publishError}
@@ -675,7 +811,6 @@ export default function App() {
         {viewMode === 'login' ? (
           <LoginPage
             auth={auth}
-            onOAuthSuccess={handleOAuthSuccess}
             onPatSuccess={handlePatSuccess}
             onLogout={handleLogout}
             onBackToArchive={() => handleNavigate('discourses')}
@@ -688,10 +823,6 @@ export default function App() {
             <h1 className="font-display text-3xl sm:text-4xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
               The requested discourse or Sayadaw path could not be located.
             </h1>
-            <p className="text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
-              Return to the Vipassana Bhavana archive index to browse teachings by Sayadaw or search
-              by Pāli title.
-            </p>
             <div className="pt-2">
               <button
                 type="button"
@@ -702,7 +833,7 @@ export default function App() {
               </button>
             </div>
           </section>
-        ) : viewMode === 'reader' ? (
+        ) : viewMode === 'reader' && activeDiscourse ? (
           <ReadingRoom
             discourse={activeDiscourse}
             allDiscourses={discourses}
@@ -731,7 +862,11 @@ export default function App() {
               totalTips={tips.length}
               totalEvents={events.length}
               isOwner={auth.isOwner}
-              onEnterReadingRoom={() => handleSelectDiscourse(activeDiscourse.id)}
+              onEnterReadingRoom={() =>
+                activeDiscourse
+                  ? handleSelectDiscourse(activeDiscourse.id)
+                  : handleNavigate('discourses')
+              }
               onExploreEvents={() => handleNavigate('events')}
               onOpenGitHubStudio={() => handleNavigate('github')}
             />
@@ -762,6 +897,7 @@ export default function App() {
                 setPresetSayadawId(undefined);
                 setIsStoreModalOpen(true);
               }}
+              onDeleteDiscourse={handleDeleteDiscourse}
               onOpenStoreModal={(presetId) => {
                 if (!auth.isOwner) return;
                 setEditingDiscourse(null);
@@ -773,7 +909,10 @@ export default function App() {
             <SayadawDirectory
               sayadaws={indexedSayadaws}
               discourses={discourses}
+              isOwner={auth.isOwner}
               onFilterBySayadaw={handleFilterBySayadaw}
+              onSaveSayadaw={handleSaveSayadaw}
+              onDeleteSayadaw={handleDeleteSayadaw}
             />
 
             <MeditationTipsSection
@@ -803,9 +942,11 @@ export default function App() {
 
             {auth.isOwner && (
               <GitHubPagesStudio
+                sayadaws={indexedSayadaws}
                 discourses={discourses}
                 tips={tips}
                 events={events}
+                pendingDeletionCount={deletedPaths.length}
                 hasUnpublishedChanges={hasUnpublishedChanges}
                 isPublishing={isPublishing}
                 publishStatus={publishStatus}

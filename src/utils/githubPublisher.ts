@@ -11,14 +11,15 @@ import { discourseToRst } from './articleLoader';
 import { discourseToMarkdown, resolveAssetUrl } from './storageAndExport';
 import { getCollectionSlug, getDiscourseSlug, getSayadawSlug } from './urlRouter';
 
-export const GITHUB_OWNER_LOGIN = (import.meta.env.VITE_GITHUB_OWNER as string | undefined) || 'theartofnoting';
+export const GITHUB_OWNER_LOGIN =
+  (import.meta.env.VITE_GITHUB_OWNER as string | undefined) || 'theartofnoting';
 export const GITHUB_REPO_SLUG = 'theartofnoting/dhamma_content';
 const PAT_SESSION_KEY = 'vipassana_bhavana_owner_pat_v1';
 const USER_SESSION_KEY = 'vipassana_bhavana_owner_user_v1';
 
 export interface AuthSessionState {
   isOwner: boolean;
-  mode: 'none' | 'oauth' | 'pat';
+  mode: 'none' | 'pat';
   user: GitHubAuthUser | null;
   patToken?: string;
 }
@@ -71,13 +72,15 @@ export async function verifyGitHubPatForOwner(token: string): Promise<GitHubAuth
   });
 
   if (!res.ok) {
-    throw new Error(`GitHub rejected this token (HTTP ${res.status}). Check that it is valid and not expired.`);
+    throw new Error(
+      `GitHub rejected this token (HTTP ${res.status}). Check that it is valid and not expired.`,
+    );
   }
 
   const user = (await res.json()) as GitHubAuthUser;
   if (user.login.toLowerCase() !== GITHUB_OWNER_LOGIN.toLowerCase()) {
     throw new Error(
-      `Signed in as @${user.login}, but editing is restricted exclusively to repository owner @${GITHUB_OWNER_LOGIN}.`,
+      `Signed in as @${user.login}, but editing is restricted exclusively to @${GITHUB_OWNER_LOGIN}.`,
     );
   }
   return user;
@@ -85,7 +88,7 @@ export async function verifyGitHubPatForOwner(token: string): Promise<GitHubAuth
 
 export async function fetchPublishedManifest(): Promise<PublishedContentManifest | null> {
   try {
-    const url = `${resolveAssetUrl('data/dhamma-content.json')}?t=${Date.now()}`;
+    const url = `${resolveAssetUrl('content/archive.json')}?t=${Date.now()}`;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = (await res.json()) as PublishedContentManifest;
@@ -152,6 +155,54 @@ async function commitFileDirectToGitHub(
   }
 }
 
+async function deleteFileDirectFromGitHub(
+  token: string,
+  filePath: string,
+  repoSlug = GITHUB_REPO_SLUG,
+): Promise<boolean> {
+  const cleanPath = filePath.replace(/^\/+/, '');
+  if (!cleanPath.startsWith('content/')) return false;
+
+  const apiUrl = `https://api.github.com/repos/${repoSlug}/contents/${cleanPath}`;
+  const getRes = await fetch(apiUrl, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+    },
+  });
+
+  if (getRes.status === 404) {
+    return false;
+  }
+  if (!getRes.ok) {
+    throw new Error(`Unable to check ${cleanPath} on GitHub (HTTP ${getRes.status}).`);
+  }
+
+  const existing = (await getRes.json()) as { sha?: string };
+  if (!existing.sha) return false;
+
+  const delRes = await fetch(apiUrl, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message: `Remove ${cleanPath}`,
+      sha: existing.sha,
+    }),
+  });
+
+  if (!delRes.ok && delRes.status !== 404) {
+    const errPayload = (await delRes.json().catch(() => ({}))) as { message?: string };
+    throw new Error(
+      `Failed to delete ${cleanPath} (HTTP ${delRes.status}): ${errPayload.message || 'Unknown error'}`,
+    );
+  }
+  return true;
+}
+
 function extractDataUrlPayload(
   dataUrl: string,
   fallbackBaseName: string,
@@ -181,55 +232,104 @@ function extractDataUrlPayload(
   };
 }
 
+export function collectDiscourseMediaPaths(d: DhammaDiscourse): string[] {
+  const paths: string[] = [];
+  const candidates = [
+    d.coverImage,
+    d.audioReferenceUrl,
+    ...(d.mediaItems?.map((m) => m.url) || []),
+  ];
+  for (const c of candidates) {
+    if (!c) continue;
+    const clean = c.trim().replace(/^\/+/, '');
+    if (clean.startsWith('content/media/')) {
+      paths.push(clean);
+    }
+  }
+  return paths;
+}
+
 export async function publishArchiveToGitHub(params: {
   auth: AuthSessionState;
   discourses: DhammaDiscourse[];
   sayadaws: SayadawProfile[];
-  customSayadaws: SayadawProfile[];
+  deletedPaths: string[];
   tips: MeditationTip[];
   events: GroupEvent[];
   formTabs: GoogleFormTab[];
   onProgress?: (step: string) => void;
 }): Promise<{
   committedFiles: string[];
+  deletedFiles: string[];
   updatedDiscourses: DhammaDiscourse[];
+  updatedSayadaws: SayadawProfile[];
   repoActionsUrl: string;
 }> {
-  const { auth, discourses, sayadaws, customSayadaws, tips, events, formTabs, onProgress } = params;
-  if (!auth.isOwner) {
-    throw new Error('Owner authentication is required to publish.');
+  const { auth, discourses, sayadaws, deletedPaths, tips, events, formTabs, onProgress } = params;
+  if (!auth.isOwner || !auth.patToken) {
+    throw new Error('GitHub Token authentication is required to publish.');
   }
 
   const filesToCommit: RepoFileCommit[] = [];
 
-  // 1. Convert any browser-uploaded data: URLs into clean public/media/* files
+  // 1. Convert any uploaded Sayadaw portraits into content/media/*
+  const cleanedSayadaws: SayadawProfile[] = sayadaws.map((s) => {
+    const sSlug = s.slug || s.id;
+    if (s.imageUrl && s.imageUrl.startsWith('data:')) {
+      const parsed = extractDataUrlPayload(s.imageUrl, `${sSlug}-portrait.jpg`);
+      if (parsed) {
+        const mediaPath = `content/media/sayadaw-${sSlug}.${parsed.extension}`;
+        filesToCommit.push({
+          path: mediaPath,
+          base64Content: parsed.base64,
+          message: `Add portrait media for ${s.name}`,
+        });
+        return { ...s, imageUrl: mediaPath };
+      }
+    }
+    return s;
+  });
+
+  // 2. Convert any browser-uploaded data: URLs into clean content/media/* files
   const cleanedDiscourses: DhammaDiscourse[] = discourses.map((d) => {
+    const sSlug = getSayadawSlug(d.sayadawId, cleanedSayadaws, d.sayadawName);
+    const cSlug = getCollectionSlug(d);
     const dSlug = getDiscourseSlug(d);
-    const updated = { ...d };
+    const ext = d.sourceFormat === 'rst' ? 'rst' : 'md';
+    const canonicalArticlePath =
+      d.repoPath && d.repoPath.startsWith('content/articles/')
+        ? d.repoPath
+        : `content/articles/${cSlug}/${sSlug}/${dSlug}.${ext}`;
+
+    const updated: DhammaDiscourse = {
+      ...d,
+      repoPath: canonicalArticlePath,
+      isUserCreated: false,
+    };
 
     if (updated.coverImage && updated.coverImage.startsWith('data:')) {
       const parsed = extractDataUrlPayload(updated.coverImage, `${dSlug}-cover.jpg`);
       if (parsed) {
-        const mediaRel = `media/${dSlug}-cover.${parsed.extension}`;
+        const mediaPath = `content/media/${dSlug}-cover.${parsed.extension}`;
         filesToCommit.push({
-          path: `public/${mediaRel}`,
+          path: mediaPath,
           base64Content: parsed.base64,
           message: `Add cover media for ${d.title}`,
         });
-        updated.coverImage = mediaRel;
+        updated.coverImage = mediaPath;
       }
     }
 
     if (updated.audioReferenceUrl && updated.audioReferenceUrl.startsWith('data:')) {
       const parsed = extractDataUrlPayload(updated.audioReferenceUrl, `${dSlug}-audio.mp3`);
       if (parsed) {
-        const mediaRel = `media/${dSlug}-audio.${parsed.extension}`;
+        const mediaPath = `content/media/${dSlug}-audio.${parsed.extension}`;
         filesToCommit.push({
-          path: `public/${mediaRel}`,
+          path: mediaPath,
           base64Content: parsed.base64,
           message: `Add audio media for ${d.title}`,
         });
-        updated.audioReferenceUrl = mediaRel;
+        updated.audioReferenceUrl = mediaPath;
       }
     }
 
@@ -238,83 +338,97 @@ export async function publishArchiveToGitHub(params: {
         if (!item.url.startsWith('data:')) return item;
         const parsed = extractDataUrlPayload(item.url, `${dSlug}-item-${idx + 1}.bin`);
         if (!parsed) return item;
-        const mediaRel = `media/${dSlug}-attachment-${idx + 1}.${parsed.extension}`;
+        const mediaPath = `content/media/${dSlug}-attachment-${idx + 1}.${parsed.extension}`;
         filesToCommit.push({
-          path: `public/${mediaRel}`,
+          path: mediaPath,
           base64Content: parsed.base64,
           message: `Add attachment media for ${d.title}`,
         });
-        return { ...item, url: mediaRel };
+        return { ...item, url: mediaPath };
       });
     }
 
     return updated;
   });
 
-  // 2. Write clean .md / .rst source files for user-authored or edited entries
+  // 3. Write .md / .rst source files for every discourse in content/articles/...
   for (const d of cleanedDiscourses) {
-    if (!d.isUserCreated) continue;
-    const sSlug = getSayadawSlug(d.sayadawId, sayadaws, d.sayadawName);
-    const cSlug = getCollectionSlug(d);
-    const dSlug = getDiscourseSlug(d);
-    const ext = d.sourceFormat === 'rst' ? 'rst' : 'md';
-    const articlePath =
-      d.repoPath && d.repoPath.startsWith('articles/')
-        ? d.repoPath
-        : `articles/${cSlug}/${sSlug}/${dSlug}.${ext}`;
-
+    const ext = d.sourceFormat === 'rst' || d.repoPath.endsWith('.rst') ? 'rst' : 'md';
     const contentStr =
-      ext === 'rst' ? discourseToRst(d, sayadaws) : discourseToMarkdown(d);
+      ext === 'rst' ? discourseToRst(d, cleanedSayadaws) : discourseToMarkdown(d);
 
     filesToCommit.push({
-      path: articlePath,
+      path: d.repoPath,
       base64Content: utf8ToBase64(contentStr),
       message: `Publish discourse: ${d.title}`,
     });
   }
 
-  // 3. Write runtime manifest public/data/dhamma-content.json so GitHub Pages updates immediately
+  // Ensure any file being committed in this batch is NOT deleted
+  const commitPathSet = new Set(filesToCommit.map((f) => f.path));
+  const activeMediaAndArticleRefs = new Set<string>();
+  for (const d of cleanedDiscourses) {
+    activeMediaAndArticleRefs.add(d.repoPath);
+    for (const m of collectDiscourseMediaPaths(d)) {
+      activeMediaAndArticleRefs.add(m);
+    }
+  }
+  for (const s of cleanedSayadaws) {
+    if (s.imageUrl?.startsWith('content/media/')) {
+      activeMediaAndArticleRefs.add(s.imageUrl);
+    }
+  }
+
+  const pathsToDelete = Array.from(new Set(deletedPaths))
+    .map((p) => p.replace(/^\/+/, ''))
+    .filter(
+      (p) =>
+        p.startsWith('content/') &&
+        p !== 'content/archive.json' &&
+        !commitPathSet.has(p) &&
+        !activeMediaAndArticleRefs.has(p),
+    );
+
+  // 4. Write runtime manifest content/archive.json
   const manifest: PublishedContentManifest = {
     version: 1,
     updatedAt: new Date().toISOString(),
+    sayadaws: cleanedSayadaws,
     discourses: cleanedDiscourses,
-    customSayadaws,
+    deletedPaths: pathsToDelete,
     tips,
     events,
     formTabs,
   };
 
   filesToCommit.push({
-    path: 'public/data/dhamma-content.json',
+    path: 'content/archive.json',
     base64Content: utf8ToBase64(JSON.stringify(manifest, null, 2)),
-    message: `Update published Vipassana Bhavana archive (${cleanedDiscourses.length} discourses)`,
+    message: `Update Vipassana Bhavana content archive (${cleanedSayadaws.length} sayadaws, ${cleanedDiscourses.length} discourses)`,
   });
 
-  onProgress?.(`Publishing ${filesToCommit.length} file(s) to ${GITHUB_REPO_SLUG}...`);
+  const totalOps = filesToCommit.length + pathsToDelete.length;
+  let opIndex = 0;
 
-  if (auth.mode === 'oauth') {
-    const res = await fetch('/api/github/publish', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ files: filesToCommit }),
-    });
-    if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(err.error || `Server publish failed (HTTP ${res.status}).`);
-    }
-  } else if (auth.mode === 'pat' && auth.patToken) {
-    for (let i = 0; i < filesToCommit.length; i++) {
-      const f = filesToCommit[i];
-      onProgress?.(`Committing (${i + 1}/${filesToCommit.length}): ${f.path}`);
-      await commitFileDirectToGitHub(auth.patToken, f);
-    }
-  } else {
-    throw new Error('No active GitHub authentication session found.');
+  for (const f of filesToCommit) {
+    opIndex += 1;
+    onProgress?.(`Saving (${opIndex}/${totalOps}): ${f.path}`);
+    await commitFileDirectToGitHub(auth.patToken, f);
+  }
+
+  const deletedFiles: string[] = [];
+  for (const delPath of pathsToDelete) {
+    opIndex += 1;
+    onProgress?.(`Removing (${opIndex}/${totalOps}): ${delPath}`);
+    const removed = await deleteFileDirectFromGitHub(auth.patToken, delPath);
+    if (removed) deletedFiles.push(delPath);
   }
 
   return {
     committedFiles: filesToCommit.map((f) => f.path),
+    deletedFiles,
     updatedDiscourses: cleanedDiscourses,
+    updatedSayadaws: cleanedSayadaws,
     repoActionsUrl: `https://github.com/${GITHUB_REPO_SLUG}/actions`,
   };
 }

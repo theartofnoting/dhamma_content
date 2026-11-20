@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Copy, Check, FilePlus, Image as ImageIcon, Plus, Trash2, Upload, X } from 'lucide-react';
+import { FilePlus, Image as ImageIcon, Plus, Trash2, Upload, X } from 'lucide-react';
 import {
   DhammaDiscourse,
   DiscourseLanguage,
@@ -41,16 +41,6 @@ const LANGUAGES: DiscourseLanguage[] = [
   'English',
   '繁體中文',
 ];
-
-function slugify(text: string): string {
-  return (
-    text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 48) || `discourse-${Date.now()}`
-  );
-}
 
 function parseContentToSections(
   rawBody: string,
@@ -137,8 +127,6 @@ export function StoreTeachingModal({
   const [discourseSlug, setDiscourseSlug] = useState('');
   const [collectionSlug, setCollectionSlug] = useState('');
   const [sourceFormat, setSourceFormat] = useState<'md' | 'rst'>('md');
-  const [repoPath, setRepoPath] = useState('');
-  const [repoPathTouched, setRepoPathTouched] = useState(false);
 
   // Media fields
   const [coverImage, setCoverImage] = useState('');
@@ -151,7 +139,6 @@ export function StoreTeachingModal({
   const [newMediaCaption, setNewMediaCaption] = useState('');
   const [showMediaPreview, setShowMediaPreview] = useState(false);
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
-  const [copiedSeed, setCopiedSeed] = useState(false);
 
   const [validationError, setValidationError] = useState<string | null>(null);
   const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -161,7 +148,6 @@ export function StoreTeachingModal({
     setValidationError(null);
     setUploadNotice(null);
     setShowMediaPreview(false);
-    setCopiedSeed(false);
 
     if (editingDiscourse) {
       setTitle(editingDiscourse.title);
@@ -189,9 +175,9 @@ export function StoreTeachingModal({
       setMarginNoteText(editingDiscourse.marginNotes[0]?.noteText || '');
       setDiscourseSlug(getDiscourseSlug(editingDiscourse));
       setCollectionSlug(getCollectionSlug(editingDiscourse));
-      setSourceFormat(editingDiscourse.sourceFormat || (editingDiscourse.repoPath.endsWith('.rst') ? 'rst' : 'md'));
-      setRepoPath(editingDiscourse.repoPath);
-      setRepoPathTouched(true);
+      setSourceFormat(
+        editingDiscourse.sourceFormat || (editingDiscourse.repoPath.endsWith('.rst') ? 'rst' : 'md'),
+      );
       setCoverImage(editingDiscourse.coverImage || '');
       setCoverCaption(editingDiscourse.coverCaption || '');
       setAudioReferenceUrl(editingDiscourse.audioReferenceUrl || '');
@@ -221,8 +207,6 @@ export function StoreTeachingModal({
       setDiscourseSlug('');
       setCollectionSlug('satipatthana-vipassana');
       setSourceFormat('md');
-      setRepoPath('');
-      setRepoPathTouched(false);
       setCoverImage('');
       setCoverCaption('');
       setAudioReferenceUrl('');
@@ -233,28 +217,6 @@ export function StoreTeachingModal({
     setNewMediaUrl('');
     setNewMediaCaption('');
   }, [isOpen, editingDiscourse, presetSayadawId, sayadaws]);
-
-  useEffect(() => {
-    if (!isOpen || repoPathTouched) return;
-    const sSlug =
-      sayadawSelection === 'custom'
-        ? slugifySegment(customSayadawName || 'sayadaw')
-        : getSayadawSlug(sayadawSelection, sayadaws);
-    const cSlug = slugifySegment(collectionSlug || collection);
-    const dSlug = slugifySegment(discourseSlug || title || 'new-discourse');
-    setRepoPath(`articles/${cSlug}/${sSlug}/${dSlug}.${sourceFormat}`);
-  }, [
-    isOpen,
-    repoPathTouched,
-    sayadawSelection,
-    customSayadawName,
-    collectionSlug,
-    collection,
-    discourseSlug,
-    title,
-    sourceFormat,
-    sayadaws,
-  ]);
 
   if (!isOpen) return null;
 
@@ -279,9 +241,9 @@ export function StoreTeachingModal({
   const handleCoverImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 1_500_000) {
+    if (file.size > 4_000_000) {
       setUploadNotice(
-        `Selected file "${file.name}" is ${(file.size / 1_000_000).toFixed(1)} MB. For GitHub Pages, place large files in public/media/${file.name} and enter "media/${file.name}" in the URL field so browser storage stays fast.`,
+        `"${file.name}" is ${(file.size / 1_000_000).toFixed(1)} MB (max 4 MB). Host larger files externally and paste the URL.`,
       );
       return;
     }
@@ -289,7 +251,26 @@ export function StoreTeachingModal({
     reader.onload = () => {
       if (typeof reader.result === 'string') {
         setCoverImage(reader.result);
-        setUploadNotice(`Attached "${file.name}" for immediate preview and local archive save.`);
+        setUploadNotice(`Attached cover image "${file.name}". Publish to save it to the archive.`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePrimaryAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 4_000_000) {
+      setUploadNotice(
+        `"${file.name}" is ${(file.size / 1_000_000).toFixed(1)} MB (max 4 MB). Host larger recordings externally and paste the URL.`,
+      );
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setAudioReferenceUrl(reader.result);
+        setUploadNotice(`Attached talk media "${file.name}". Publish to save it to the archive.`);
       }
     };
     reader.readAsDataURL(file);
@@ -298,9 +279,9 @@ export function StoreTeachingModal({
   const handleAttachmentFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 1_500_000) {
+    if (file.size > 4_000_000) {
       setUploadNotice(
-        `"${file.name}" is ${(file.size / 1_000_000).toFixed(1)} MB. Commit large MP3/MP4/PDF files under public/media/${file.name} in GitHub and enter "media/${file.name}" below.`,
+        `"${file.name}" is ${(file.size / 1_000_000).toFixed(1)} MB (max 4 MB). Host larger files externally and paste the URL.`,
       );
       return;
     }
@@ -331,7 +312,7 @@ export function StoreTeachingModal({
 
   const handleAddMediaItem = () => {
     if (!newMediaUrl.trim()) {
-      setValidationError('Enter a media URL or repo path (e.g., https://youtu.be/... or media/talk.mp3) before clicking Add Attachment.');
+      setValidationError('Enter a media URL before clicking Add Media.');
       return;
     }
     setValidationError(null);
@@ -361,22 +342,23 @@ export function StoreTeachingModal({
     const chosenSayadaw = sayadaws.find((s) => s.id === sayadawSelection);
     const resolvedSayadawName =
       sayadawSelection === 'custom'
-        ? customSayadawName.trim() || 'Sayadaw (Archive Contributor)'
-        : chosenSayadaw?.name || 'Ven. Dr. Nandamālābhivaṃsa';
+        ? customSayadawName.trim() || 'Sayadaw'
+        : chosenSayadaw?.name || 'Sayadaw';
     const resolvedSayadawId =
-      sayadawSelection === 'custom' ? slugify(resolvedSayadawName) : sayadawSelection;
+      sayadawSelection === 'custom' ? slugifySegment(resolvedSayadawName) : sayadawSelection;
 
     let newSayadaw: SayadawProfile | undefined;
     if (sayadawSelection === 'custom' && !sayadaws.some((s) => s.id === resolvedSayadawId)) {
       newSayadaw = {
         id: resolvedSayadawId,
+        slug: resolvedSayadawId,
         name: resolvedSayadawName,
-        honorificTitle: 'Group & Lineage Sayadaw',
-        monastery: customSayadawMonastery.trim() || 'Vipassana Bhavana Study Group',
-        location: 'Archive Contributor Lineage',
+        honorificTitle: 'Sayadaw',
+        monastery: customSayadawMonastery.trim() || 'Vipassana Bhavana Archive',
+        location: '',
         lineage: collection,
-        years: 'Contemporary',
-        biography: `Discourses and study recordings indexed under ${resolvedSayadawName}.`,
+        years: '',
+        biography: `Discourses indexed under ${resolvedSayadawName}.`,
         primaryTexts: sourceText.trim() ? [sourceText.trim()] : [],
       };
     }
@@ -384,12 +366,11 @@ export function StoreTeachingModal({
     const sections = parseContentToSections(bodyContent, paliExcerpt, paliTranslation);
     const sSlug =
       sayadawSelection === 'custom'
-        ? slugify(resolvedSayadawName)
+        ? slugifySegment(resolvedSayadawName)
         : getSayadawSlug(resolvedSayadawId, sayadaws, resolvedSayadawName);
     const cSlug = slugifySegment(collectionSlug || collection);
     const dSlug = slugifySegment(discourseSlug || title || 'new-discourse');
-    const computedRepoPath =
-      repoPath.trim() || `articles/${cSlug}/${sSlug}/${dSlug}.${sourceFormat}`;
+    const computedRepoPath = `content/articles/${cSlug}/${sSlug}/${dSlug}.${sourceFormat}`;
 
     const nextNumber = String(existingCount + 1).padStart(2, '0');
     const prefix =
@@ -438,16 +419,11 @@ export function StoreTeachingModal({
                 anchorLabel: 'Archival Note',
                 termPali: marginTerm.trim(),
                 noteText: marginNoteText.trim(),
-                sourceCitation: sourceText.trim() || 'theartofnoting/dhamma_content',
+                sourceCitation: sourceText.trim() || 'Vipassana Bhavana',
               },
             ]
           : editingDiscourse?.marginNotes || [],
-      footnotes: editingDiscourse?.footnotes || [
-        {
-          index: 1,
-          text: 'Stored in Vipassana Bhavana (Dhamma Page) and committed to theartofnoting/dhamma_content.',
-        },
-      ],
+      footnotes: editingDiscourse?.footnotes || [],
       coverImage: coverImage.trim() || undefined,
       coverCaption: coverCaption.trim() || undefined,
       audioReferenceUrl: audioReferenceUrl.trim() || undefined,
@@ -459,18 +435,6 @@ export function StoreTeachingModal({
 
     draft.readingMinutes = calculateEstimatedReadingMinutes(draft);
     return { discourse: draft, newSayadaw };
-  };
-
-  const handleCopyTypeScriptSeed = async () => {
-    const { discourse } = buildDiscoursePayload();
-    const snippet = `${JSON.stringify(discourse, null, 2)},`;
-    try {
-      await navigator.clipboard.writeText(snippet);
-      setCopiedSeed(true);
-      setTimeout(() => setCopiedSeed(false), 2000);
-    } catch {
-      // Ignore clipboard permission errors
-    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -508,7 +472,7 @@ export function StoreTeachingModal({
         <div className="flex items-start justify-between gap-4 pb-5 border-b border-[#E5DFD3] dark:border-[#342E28]">
           <div className="space-y-1">
             <p className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74]">
-              theartofnoting/dhamma_content · Discourse Writing &amp; Media Editor
+              Discourse &amp; Media Editor
             </p>
             <h2
               id="store-teaching-heading"
@@ -549,7 +513,7 @@ export function StoreTeachingModal({
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Contemplation of Feeling (Vedanānupassanā) in Daily Practice"
+                placeholder="e.g., Contemplation of Feeling (Vedanānupassanā)"
                 className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
               />
             </div>
@@ -606,7 +570,7 @@ export function StoreTeachingModal({
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                    Sayadaw Monastery / Center (Optional)
+                    Monastery / Center (Optional)
                   </label>
                   <input
                     type="text"
@@ -703,7 +667,7 @@ export function StoreTeachingModal({
 
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                URL Collection Folder Slug
+                URL Collection Slug
               </label>
               <input
                 type="text"
@@ -726,22 +690,6 @@ export function StoreTeachingModal({
                 <option value="md">Markdown (.md)</option>
                 <option value="rst">reStructuredText (.rst)</option>
               </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                Target Source Path (GitHub)
-              </label>
-              <input
-                type="text"
-                value={repoPath}
-                onChange={(e) => {
-                  setRepoPathTouched(true);
-                  setRepoPath(e.target.value);
-                }}
-                placeholder="articles/collection/sayadaw-name/discourse-slug.md"
-                className="w-full min-h-[42px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-              />
             </div>
           </div>
 
@@ -861,15 +809,9 @@ export function StoreTeachingModal({
           {/* 3. Media: Cover Image, Audio/Video Talk, Additional Attachments */}
           <div className="pt-4 border-t border-[#E5DFD3] dark:border-[#342E28] space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
-                  Media &amp; Recordings
-                </h3>
-                <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                  Paste a YouTube link, MP3/MP4 URL, image URL, upload a file, or reference files
-                  stored in <span className="font-mono-code">public/media/</span>.
-                </p>
-              </div>
+              <h3 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+                Media &amp; Recordings
+              </h3>
               {(audioReferenceUrl.trim() || mediaItems.length > 0) && (
                 <button
                   type="button"
@@ -890,14 +832,14 @@ export function StoreTeachingModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                  Cover Image URL or Repo Path
+                  Cover Image
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={coverImage}
                     onChange={(e) => setCoverImage(e.target.value)}
-                    placeholder="https://... or media/retreat-hall.jpg"
+                    placeholder="https://... or upload an image"
                     className="flex-1 min-h-[40px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
                   />
                   <label className="inline-flex items-center gap-1.5 min-h-[40px] px-3 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer shrink-0">
@@ -928,15 +870,27 @@ export function StoreTeachingModal({
 
               <div className="sm:col-span-2 space-y-1.5">
                 <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                  Primary Audio / Video Talk URL (YouTube, MP3, MP4, or <span className="font-mono-code">media/talk.mp3</span>)
+                  Primary Audio / Video Talk (YouTube, MP3/MP4 URL, or Upload)
                 </label>
-                <input
-                  type="text"
-                  value={audioReferenceUrl}
-                  onChange={(e) => setAudioReferenceUrl(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?v=... or https://.../talk.mp3"
-                  className="w-full min-h-[40px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={audioReferenceUrl}
+                    onChange={(e) => setAudioReferenceUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=... or upload audio/video"
+                    className="flex-1 min-h-[40px] px-3 py-2 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                  />
+                  <label className="inline-flex items-center gap-1.5 min-h-[40px] px-3 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer shrink-0">
+                    <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Upload</span>
+                    <input
+                      type="file"
+                      accept="audio/*,video/*"
+                      onChange={handlePrimaryAudioUpload}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -948,7 +902,7 @@ export function StoreTeachingModal({
                 </p>
                 <label className="inline-flex items-center gap-1.5 min-h-[34px] px-3 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer">
                   <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Upload File (Image/Audio)</span>
+                  <span>Upload File</span>
                   <input
                     type="file"
                     accept="image/*,audio/*,video/*,.pdf"
@@ -973,7 +927,7 @@ export function StoreTeachingModal({
                           {item.title}
                         </p>
                         <p className="font-mono-code text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
-                          {item.url.startsWith('data:') ? 'Uploaded embedded file' : item.url}
+                          {item.url.startsWith('data:') ? 'Uploaded file ready to publish' : item.url}
                         </p>
                       </div>
                       <button
@@ -1019,13 +973,13 @@ export function StoreTeachingModal({
                 </div>
                 <div className="sm:col-span-5 space-y-1">
                   <label className="block text-[11px] text-[#57534E] dark:text-[#A8A29E]">
-                    Media URL or <span className="font-mono-code">media/...</span> Path
+                    Media URL
                   </label>
                   <input
                     type="text"
                     value={newMediaUrl}
                     onChange={(e) => setNewMediaUrl(e.target.value)}
-                    placeholder="https://... or media/notes.pdf"
+                    placeholder="https://..."
                     className="w-full min-h-[38px] px-2.5 font-mono-code text-xs bg-[#FBF9F5] dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832]"
                   />
                 </div>
@@ -1060,41 +1014,20 @@ export function StoreTeachingModal({
             )}
           </div>
 
-          <div className="pt-4 border-t border-[#E5DFD3] dark:border-[#342E28] flex flex-wrap items-center justify-between gap-3">
+          <div className="pt-4 border-t border-[#E5DFD3] dark:border-[#342E28] flex flex-wrap items-center justify-end gap-3">
             <button
               type="button"
-              onClick={handleCopyTypeScriptSeed}
-              className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412] cursor-pointer"
-              title="Copy formatted JSON/TypeScript entry to paste into src/data/dhammaSeed.ts for all visitors"
+              onClick={onClose}
+              className="min-h-[44px] px-5 py-2 text-sm font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#1C1917] cursor-pointer"
             >
-              {copiedSeed ? (
-                <>
-                  <Check className="h-3.5 w-3.5 text-[#14532D] dark:text-[#86EFAC]" />
-                  <span>Copied Entry for dhammaSeed.ts</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  <span>Copy Entry for dhammaSeed.ts</span>
-                </>
-              )}
+              Cancel
             </button>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="min-h-[44px] px-5 py-2 text-sm font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#1C1917] cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="min-h-[44px] px-6 py-2 text-sm font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] cursor-pointer"
-              >
-                {editingDiscourse ? 'Update Discourse' : 'Save to Archive'}
-              </button>
-            </div>
+            <button
+              type="submit"
+              className="min-h-[44px] px-6 py-2 text-sm font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] cursor-pointer"
+            >
+              {editingDiscourse ? 'Update Discourse' : 'Save Discourse'}
+            </button>
           </div>
         </form>
       </div>

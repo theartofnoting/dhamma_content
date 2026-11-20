@@ -200,18 +200,16 @@ export function ReadingRoom({
             </button>
 
             {isOwner && (
-              <button
-                type="button"
-                onClick={() => onEditDiscourse(discourse)}
-                className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Edit Content &amp; Media</span>
-              </button>
-            )}
-
-            {isOwner && discourse.isUserCreated && (
               <>
+                <button
+                  type="button"
+                  onClick={() => onEditDiscourse(discourse)}
+                  className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Edit Content &amp; Media</span>
+                </button>
+
                 {!confirmDelete ? (
                   <button
                     type="button"
@@ -222,13 +220,22 @@ export function ReadingRoom({
                     <span>Delete</span>
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => onDeleteDiscourse(discourse.id)}
-                    className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs bg-[#9A3412] text-[#FBF9F5] cursor-pointer whitespace-nowrap shrink-0"
-                  >
-                    Confirm Delete
-                  </button>
+                  <span className="inline-flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onDeleteDiscourse(discourse.id)}
+                      className="inline-flex items-center gap-1.5 min-h-[38px] px-3 text-xs bg-[#9A3412] text-[#FBF9F5] cursor-pointer whitespace-nowrap shrink-0"
+                    >
+                      Confirm Delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(false)}
+                      className="text-xs text-[#57534E] dark:text-[#A8A29E] cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </span>
                 )}
               </>
             )}
@@ -446,7 +453,7 @@ export function ReadingRoom({
               )}
             </div>
 
-            {/* Canonical Indexed URL & Repository Source Path */}
+            {/* Canonical Indexed URL & Export */}
             <div className="p-5 border border-[#E5DFD3] dark:border-[#342E28] space-y-3">
               <div className="space-y-1">
                 <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
@@ -483,14 +490,6 @@ export function ReadingRoom({
                 )}
               </button>
 
-              <div className="pt-3 border-t border-[#E5DFD3] dark:border-[#342E28] space-y-1">
-                <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
-                  Repository Source ({discourse.sourceFormat === 'rst' ? 'reStructuredText' : 'Markdown'})
-                </p>
-                <p className="font-mono-code text-xs break-all text-[#1C1917] dark:text-[#F5F5F4]">
-                  {discourse.repoPath}
-                </p>
-              </div>
               <button
                 type="button"
                 onClick={() => onExportMarkdown(discourse)}

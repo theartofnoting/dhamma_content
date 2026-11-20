@@ -4,6 +4,7 @@ import { AuthSessionState, GITHUB_OWNER_LOGIN } from '../utils/githubPublisher';
 interface OwnerSessionBarProps {
   auth: AuthSessionState;
   hasUnpublishedChanges: boolean;
+  pendingDeletionCount?: number;
   isPublishing: boolean;
   publishStatus: string | null;
   publishError: string | null;
@@ -16,6 +17,7 @@ interface OwnerSessionBarProps {
 export function OwnerSessionBar({
   auth,
   hasUnpublishedChanges,
+  pendingDeletionCount = 0,
   isPublishing,
   publishStatus,
   publishError,
@@ -26,23 +28,25 @@ export function OwnerSessionBar({
 }: OwnerSessionBarProps) {
   if (!auth.isOwner) return null;
 
+  const statusText = hasUnpublishedChanges
+    ? pendingDeletionCount > 0
+      ? `Unpublished edits (${pendingDeletionCount} removal${pendingDeletionCount === 1 ? '' : 's'} queued)`
+      : 'Unpublished edits ready to commit'
+    : 'Synced with repository';
+
   return (
     <div className="border-b border-[#D6CEBE] dark:border-[#342E28] bg-[#F4EFE6] dark:bg-[#221E1A]">
       <div className="mx-auto max-w-[1200px] px-4 py-2.5 sm:px-8 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-2.5 text-[#1C1917] dark:text-[#F5F5F4]">
           <ShieldCheck className="h-4 w-4 text-[#14532D] dark:text-[#86EFAC]" aria-hidden="true" />
           <span className="font-medium">
-            Owner Mode:{' '}
+            Owner:{' '}
             <span className="font-mono-code">@{auth.user?.login || GITHUB_OWNER_LOGIN}</span>
           </span>
           <span aria-hidden="true" className="text-[#A8A29E]">
             ·
           </span>
-          <span className="text-[#57534E] dark:text-[#A8A29E]">
-            {hasUnpublishedChanges
-              ? 'Unpublished browser edits ready to commit'
-              : 'Synced with repository'}
-          </span>
+          <span className="text-[#57534E] dark:text-[#A8A29E]">{statusText}</span>
           {publishStatus && (
             <>
               <span aria-hidden="true" className="text-[#A8A29E]">
@@ -87,7 +91,7 @@ export function OwnerSessionBar({
             onClick={onOpenGitHubStudio}
             className="min-h-[34px] px-3 py-1.5 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer whitespace-nowrap"
           >
-            GitHub Studio
+            Manage &amp; Backup
           </button>
 
           <button

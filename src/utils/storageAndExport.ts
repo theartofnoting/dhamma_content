@@ -15,6 +15,7 @@ const STORED_SAYADAWS_KEY = 'vipassana_bhavana_sayadaws_v1';
 const STORED_TIPS_KEY = 'vipassana_bhavana_tips_v1';
 const STORED_EVENTS_KEY = 'vipassana_bhavana_events_v1';
 const STORED_FORMS_KEY = 'vipassana_bhavana_forms_v1';
+const STORED_DELETED_PATHS_KEY = 'vipassana_bhavana_deleted_paths_v1';
 const BOOKMARKS_KEY = 'nanda_dhamma_bookmarks_v1';
 const PREFS_KEY = 'nanda_dhamma_reader_prefs_v1';
 
@@ -23,7 +24,7 @@ export function loadStoredDiscourses(seed: DhammaDiscourse[]): DhammaDiscourse[]
     const raw = localStorage.getItem(STORED_DISCOURSES_KEY);
     if (!raw) return seed;
     const parsed = JSON.parse(raw) as DhammaDiscourse[];
-    if (!Array.isArray(parsed) || parsed.length === 0) return seed;
+    if (!Array.isArray(parsed)) return seed;
     return parsed;
   } catch {
     return seed;
@@ -35,6 +36,25 @@ export function saveStoredDiscourses(discourses: DhammaDiscourse[]): void {
     localStorage.setItem(STORED_DISCOURSES_KEY, JSON.stringify(discourses));
   } catch {
     // Ignore storage quota errors cleanly
+  }
+}
+
+export function loadStoredDeletedPaths(): string[] {
+  try {
+    const raw = localStorage.getItem(STORED_DELETED_PATHS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredDeletedPaths(paths: string[]): void {
+  try {
+    localStorage.setItem(STORED_DELETED_PATHS_KEY, JSON.stringify(paths));
+  } catch {
+    // Ignore
   }
 }
 
@@ -119,29 +139,28 @@ export function saveStoredCustomSayadaws(sayadaws: SayadawProfile[]): void {
 
 export function buildIndexedSayadaws(
   seedSayadaws: SayadawProfile[],
-  customSayadaws: SayadawProfile[],
+  managedSayadaws: SayadawProfile[],
   discourses: DhammaDiscourse[],
 ): SayadawProfile[] {
   const byId = new Map<string, SayadawProfile>();
   for (const s of seedSayadaws) {
     byId.set(s.id, s);
   }
-  for (const s of customSayadaws) {
-    if (!byId.has(s.id)) {
-      byId.set(s.id, s);
-    }
+  for (const s of managedSayadaws) {
+    byId.set(s.id, s);
   }
   for (const d of discourses) {
     if (d.sayadawId && !byId.has(d.sayadawId)) {
       byId.set(d.sayadawId, {
         id: d.sayadawId,
+        slug: d.sayadawId,
         name: d.sayadawName || d.sayadawId,
-        honorificTitle: 'Group & Archive Contributor Lineage',
-        monastery: 'Vipassana Bhavana Study Group',
-        location: 'Archive Index',
+        honorificTitle: 'Sayadaw Lineage',
+        monastery: 'Vipassana Bhavana Archive',
+        location: '',
         lineage: d.collection,
-        years: 'Contemporary',
-        biography: `Teachings and recorded discourses indexed under ${d.sayadawName}.`,
+        years: '',
+        biography: `Discourses indexed under ${d.sayadawName || d.sayadawId}.`,
         primaryTexts: [d.sourceText].filter(Boolean),
       });
     }
@@ -156,6 +175,7 @@ export function clearAllStoredArchive(): void {
     localStorage.removeItem(STORED_TIPS_KEY);
     localStorage.removeItem(STORED_EVENTS_KEY);
     localStorage.removeItem(STORED_FORMS_KEY);
+    localStorage.removeItem(STORED_DELETED_PATHS_KEY);
   } catch {
     // Ignore
   }
@@ -272,10 +292,13 @@ export function resolveAssetUrl(rawUrl: string): string {
     return trimmed;
   }
   const base = import.meta.env.BASE_URL || '/';
-  if (trimmed.startsWith(base)) {
+  if (trimmed.startsWith(base) && base !== '/') {
     return trimmed;
   }
   const cleaned = trimmed.replace(/^\/+/, '').replace(/^public\//i, '');
+  if (cleaned.startsWith('media/')) {
+    return `${base}content/${cleaned}`;
+  }
   return `${base}${cleaned}`;
 }
 

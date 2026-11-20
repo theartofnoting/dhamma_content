@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "updatedAt": "2026-11-19T00:00:00.000Z",
+  "sayadaws": [
+    {
+      "id": "ven-mogok",
+      "slug": "ven-mogok",
+      "name": "Ven. Mogok Sayadaw (U Vimala)",
+      "honorificTitle": "Aggamahāpaṇḍita",
+      "chineseName": "莫哥薩亞多（Mogok Sayadaw）",
+      "monastery": "Mingala Taik Monastery",
+      "location": "Mogok & Mandalay, Myanmar",
+      "lineage": "Paṭiccasamuppāda & Cittānupassanā Vipassanā",
+      "years": "1899–1962",
+      "biography": "Master exponent of Dependent Origination (Paṭiccasamuppāda) applied directly to contemplative insight, emphasizing discernment of arising and passing away of consciousness (citta) to sever craving (taṇhā).",
+      "primaryTexts": [
+        "Dhamma Talks by Mogok Sayadaw"
+      ]
+    }
+  ],
+  "discourses": [],
+  "deletedPaths": []
+}

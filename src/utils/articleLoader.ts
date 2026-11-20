@@ -9,7 +9,7 @@ import {
 import { calculateEstimatedReadingMinutes } from './storageAndExport';
 import { getCollectionSlug, getDiscourseSlug, getSayadawSlug, slugifySegment } from './urlRouter';
 
-const rawArticleModules = import.meta.glob('/articles/**/*.{md,rst}', {
+const rawArticleModules = import.meta.glob('/content/articles/**/*.{md,rst}', {
   query: '?raw',
   import: 'default',
   eager: true,
@@ -49,14 +49,15 @@ function inferPathSegments(filePath: string): {
   fileSlug: string;
   format: 'md' | 'rst';
 } {
-  // Expected: /articles/<collectionSlug>/<sayadawSlug>/<fileSlug>.(md|rst)
+  // Expected: /content/articles/<collectionSlug>/<sayadawSlug>/<fileSlug>.(md|rst)
   const clean = filePath.replace(/^\/+/, '');
   const parts = clean.split('/').filter(Boolean);
   const filename = parts[parts.length - 1] || 'discourse.md';
   const format: 'md' | 'rst' = filename.toLowerCase().endsWith('.rst') ? 'rst' : 'md';
   const fileSlug = filename.replace(/\.(md|rst)$/i, '');
 
-  const withoutPrefix = parts[0] === 'articles' ? parts.slice(1) : parts;
+  const withoutContent = parts[0] === 'content' ? parts.slice(1) : parts;
+  const withoutPrefix = withoutContent[0] === 'articles' ? withoutContent.slice(1) : withoutContent;
   if (withoutPrefix.length >= 3) {
     return {
       collectionSlug: slugifySegment(withoutPrefix[0]),
@@ -194,12 +195,14 @@ function parseMarkdownArticle(
       sections[0]?.paragraphs[0]?.slice(0, 160) ||
       'Observe phenomena as they arise and pass away.',
     marginNotes: [],
-    footnotes: [
-      {
-        index: 1,
-        text: `Loaded directly from repository file ${filePath.replace(/^\/+/, '')}.`,
-      },
-    ],
+    footnotes: meta.source
+      ? [
+          {
+            index: 1,
+            text: meta.source,
+          },
+        ]
+      : [],
     coverImage: meta.cover_image || undefined,
     audioReferenceUrl: meta.audio || meta.audio_reference || undefined,
     repoPath: filePath.replace(/^\/+/, ''),
@@ -363,12 +366,14 @@ function parseRstArticle(
       sections[0]?.paragraphs[0]?.slice(0, 160) ||
       'Contemplate arising and passing away in the present moment.',
     marginNotes: [],
-    footnotes: [
-      {
-        index: 1,
-        text: `Parsed from reStructuredText file ${filePath.replace(/^\/+/, '')}.`,
-      },
-    ],
+    footnotes: meta.source
+      ? [
+          {
+            index: 1,
+            text: meta.source,
+          },
+        ]
+      : [],
     coverImage: meta.cover_image || undefined,
     audioReferenceUrl: meta.audio || undefined,
     mediaItems: mediaItems.length > 0 ? mediaItems : undefined,

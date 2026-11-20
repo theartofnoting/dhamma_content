@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import {
-  Check,
-  Copy,
   Download,
   ExternalLink,
   FileText,
@@ -15,6 +13,7 @@ import {
   GitHubRepoInfo,
   GroupEvent,
   MeditationTip,
+  SayadawProfile,
 } from '../types/dhamma';
 import {
   fetchGitHubRepoSnapshot,
@@ -23,9 +22,11 @@ import {
 } from '../utils/storageAndExport';
 
 interface GitHubPagesStudioProps {
+  sayadaws: SayadawProfile[];
   discourses: DhammaDiscourse[];
   tips: MeditationTip[];
   events: GroupEvent[];
+  pendingDeletionCount: number;
   hasUnpublishedChanges: boolean;
   isPublishing: boolean;
   publishStatus: string | null;
@@ -38,17 +39,12 @@ interface GitHubPagesStudioProps {
 const DEFAULT_REPO_SLUG = 'theartofnoting/dhamma_content';
 const TARGET_PAGES_URL = 'https://theartofnoting.github.io/dhamma_content/';
 
-const GIT_DEPLOY_COMMANDS = `git init
-git add .
-git commit -m "Deploy Vipassana Bhavana Dhamma Page"
-git branch -M main
-git remote add origin https://github.com/theartofnoting/dhamma_content.git
-git push -u origin main`;
-
 export function GitHubPagesStudio({
+  sayadaws,
   discourses,
   tips,
   events,
+  pendingDeletionCount,
   hasUnpublishedChanges,
   isPublishing,
   publishStatus,
@@ -62,7 +58,6 @@ export function GitHubPagesStudio({
   const [repoFiles, setRepoFiles] = useState<GitHubContentEntry[]>([]);
   const [loadingRepo, setLoadingRepo] = useState(false);
   const [repoError, setRepoError] = useState<string | null>(null);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleFetchRepo = async () => {
     setLoadingRepo(true);
@@ -73,22 +68,10 @@ export function GitHubPagesStudio({
       setRepoFiles(snapshot.contents);
     } catch (err) {
       setRepoError(
-        err instanceof Error
-          ? err.message
-          : 'Unable to reach GitHub API right now. You can still export all static GitHub Pages files below.',
+        err instanceof Error ? err.message : 'Unable to reach GitHub API right now.',
       );
     } finally {
       setLoadingRepo(false);
-    }
-  };
-
-  const handleCopy = async (key: string, value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedKey(key);
-      setTimeout(() => setCopiedKey(null), 1800);
-    } catch {
-      // Ignore clipboard permission errors
     }
   };
 
@@ -103,9 +86,7 @@ export function GitHubPagesStudio({
       repository: `https://github.com/${repoSlug}`,
       exportedAt: new Date().toISOString(),
       license: 'CC BY-NC-SA 4.0 (Dhamma-dāna)',
-      totalDiscourses: discourses.length,
-      totalTips: tips.length,
-      totalEvents: events.length,
+      sayadaws,
       discourses,
       meditationTips: tips,
       events,
@@ -125,49 +106,26 @@ export function GitHubPagesStudio({
       <div className="mx-auto max-w-[1200px] px-4 py-14 sm:px-8 sm:py-16">
         <div className="max-w-3xl space-y-2 pb-10 border-b border-[#E5DFD3] dark:border-[#342E28]">
           <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
-            06. GitHub Pages Deployment
+            06. Archive Publishing &amp; Backups
           </p>
           <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] text-balance">
-            Deploy to github.com/theartofnoting/dhamma_content
+            Publish &amp; Backup Archive
           </h2>
-          <p className="text-sm sm:text-base leading-relaxed text-[#57534E] dark:text-[#A8A29E]">
-            This repository is pre-configured with{' '}
-            <span className="font-mono-code text-[#1C1917] dark:text-[#F5F5F4]">
-              .github/workflows/pages.yml
-            </span>{' '}
-            and Vite subpath support (
-            <span className="font-mono-code text-[#1C1917] dark:text-[#F5F5F4]">
-              /dhamma_content/
-            </span>
-            ) to publish automatically to{' '}
-            <a
-              href={TARGET_PAGES_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono-code text-[#9A3412] dark:text-[#FDBA74] hover:underline"
-            >
-              theartofnoting.github.io/dhamma_content
-            </a>
-            .
-          </p>
         </div>
 
-        {/* Direct Browser-to-GitHub Publisher Card */}
+        {/* Publish Changes Card */}
         <div className="mt-8 p-6 border border-[#D6CEBE] dark:border-[#342E28] bg-[#FBF9F5] dark:bg-[#181512] flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1.5 max-w-2xl">
             <p className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74]">
-              Direct Browser Commit · @{repoSlug}
+              {repoSlug}
             </p>
             <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
-              Publish Browser Edits to GitHub Pages
+              Sync Browser Edits to GitHub
             </h3>
-            <p className="text-xs leading-relaxed text-[#57534E] dark:text-[#A8A29E]">
-              Commits <span className="font-mono-code">public/data/dhamma-content.json</span>, your
-              authored <span className="font-mono-code">articles/.../*.md</span> or{' '}
-              <span className="font-mono-code">.rst</span> files, and uploaded media under{' '}
-              <span className="font-mono-code">public/media/</span> directly to{' '}
-              <span className="font-mono-code">{repoSlug}</span> so GitHub Actions rebuilds Pages
-              automatically.
+            <p className="text-xs leading-relaxed text-[#57534E] dark:text-[#A8A29E] tabular-nums">
+              {sayadaws.length} Sayadaw(s) · {discourses.length} discourse(s) · {tips.length} tip(s) ·{' '}
+              {events.length} event(s)
+              {pendingDeletionCount > 0 ? ` · ${pendingDeletionCount} file removal(s) queued` : ''}
             </p>
             {publishStatus && (
               <p className="font-mono-code text-xs text-[#14532D] dark:text-[#86EFAC] pt-1">
@@ -211,111 +169,86 @@ export function GitHubPagesStudio({
           </button>
         </div>
 
-        {/* 2-Column Studio Split */}
         <div className="pt-10 grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-          {/* Left: Step-by-Step Deployment Commands & Export Files */}
-          <div className="lg:col-span-6 space-y-8">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
-                  1. Push Code to GitHub
-                </h3>
+          {/* Left: Export Backups */}
+          <div className="lg:col-span-6 space-y-6">
+            <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+              Export Archive Backups
+            </h3>
+
+            <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28] border-t border-b border-[#E5DFD3] dark:border-[#342E28]">
+              <div className="py-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-mono-code text-sm text-[#1C1917] dark:text-[#F5F5F4]">
+                    dhamma-archive.json
+                  </p>
+                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E] tabular-nums">
+                    Backup of {sayadaws.length} sayadaws, {discourses.length} discourses,{' '}
+                    {tips.length} tips, and {events.length} events
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => handleCopy('git-cmds', GIT_DEPLOY_COMMANDS)}
-                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer"
+                  onClick={handleDownloadArchiveJson}
+                  className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-medium bg-[#1C1917] text-[#FBF9F5] dark:bg-[#F5F5F4] dark:text-[#1C1917] hover:bg-[#9A3412] dark:hover:bg-[#FDBA74] cursor-pointer whitespace-nowrap shrink-0"
                 >
-                  {copiedKey === 'git-cmds' ? (
-                    <>
-                      <Check className="h-3.5 w-3.5 text-[#14532D] dark:text-[#86EFAC]" />
-                      <span>Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3.5 w-3.5" />
-                      <span>Copy Commands</span>
-                    </>
-                  )}
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Export JSON</span>
                 </button>
               </div>
 
-              <pre className="p-4 overflow-x-auto text-xs leading-relaxed font-mono-code bg-[#1C1917] text-[#F5F5F4] dark:bg-[#14110F] border border-[#342E28]">
-                {GIT_DEPLOY_COMMANDS}
-              </pre>
-
-              <div className="p-4 border border-[#E5DFD3] dark:border-[#342E28] bg-[#FBF9F5] dark:bg-[#181512] space-y-2 text-xs leading-relaxed text-[#44403C] dark:text-[#D6D3D1]">
-                <p className="font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
-                  2. Enable GitHub Pages in Repository Settings
-                </p>
-                <p>
-                  Open{' '}
-                  <a
-                    href="https://github.com/theartofnoting/dhamma_content/settings/pages"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#9A3412] dark:text-[#FDBA74] underline"
-                  >
-                    Settings → Pages
-                  </a>{' '}
-                  in your repository and set <strong>Build and deployment → Source</strong> to{' '}
-                  <strong>GitHub Actions</strong>. Each push to <span className="font-mono-code">main</span>{' '}
-                  runs <span className="font-mono-code">.github/workflows/pages.yml</span> and
-                  publishes all Discourses, Sayadaws, Meditation Tips, Events, and Embedded Google
-                  Forms to <span className="font-mono-code">theartofnoting.github.io/dhamma_content/</span>.
-                </p>
+              <div className="py-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-mono-code text-sm text-[#1C1917] dark:text-[#F5F5F4]">
+                    pages.yml
+                  </p>
+                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                    GitHub Pages deployment workflow
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadWorkflow}
+                  className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>pages.yml</span>
+                </button>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
-                Export Deployment &amp; Backup Files
-              </h3>
-
-              <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28] border-t border-b border-[#E5DFD3] dark:border-[#342E28]">
-                <div className="py-4 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="font-mono-code text-sm text-[#1C1917] dark:text-[#F5F5F4]">
-                      .github/workflows/pages.yml
-                    </p>
-                    <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                      Builds with VITE_BASE_PATH=/dhamma_content/ and deploys to GitHub Pages
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleDownloadWorkflow}
-                    className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
-                  >
-                    <Download className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>pages.yml</span>
-                  </button>
-                </div>
-
-                <div className="py-4 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="font-mono-code text-sm text-[#1C1917] dark:text-[#F5F5F4]">
-                      dhamma-archive.json
-                    </p>
-                    <p className="text-xs text-[#57534E] dark:text-[#A8A29E] tabular-nums">
-                      Full backup of {discourses.length} discourses, {tips.length} tips, and{' '}
-                      {events.length} events
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleDownloadArchiveJson}
-                    className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-medium bg-[#1C1917] text-[#FBF9F5] dark:bg-[#F5F5F4] dark:text-[#1C1917] hover:bg-[#9A3412] dark:hover:bg-[#FDBA74] cursor-pointer whitespace-nowrap shrink-0"
-                  >
-                    <Download className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>Export JSON</span>
-                  </button>
+            {discourses.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <h4 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+                  Download Individual Discourses
+                </h4>
+                <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28] border-t border-b border-[#E5DFD3] dark:border-[#342E28] max-h-60 overflow-y-auto">
+                  {discourses.map((d) => (
+                    <div key={d.id} className="py-2.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-[#1C1917] dark:text-[#F5F5F4] truncate">
+                          {d.title}
+                        </p>
+                        <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
+                          {d.sayadawName}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onExportMarkdown(d)}
+                        className="text-xs font-medium text-[#9A3412] dark:text-[#FDBA74] hover:underline whitespace-nowrap shrink-0 cursor-pointer"
+                      >
+                        Download .md
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Right: Live GitHub Repo Inspector + Per-Discourse Markdown Export */}
-          <div className="lg:col-span-6 space-y-8">
+          {/* Right: Live GitHub Repo Inspector */}
+          <div className="lg:col-span-6">
             <div className="p-6 border border-[#E5DFD3] dark:border-[#342E28] bg-[#FBF9F5] dark:bg-[#181512] space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
@@ -360,14 +293,6 @@ export function GitHubPagesStudio({
                 </div>
               )}
 
-              {!repoInfo && !repoError && !loadingRepo && (
-                <p className="text-xs leading-relaxed text-[#57534E] dark:text-[#A8A29E]">
-                  Click “Check Repo Status” to query the public GitHub REST API for{' '}
-                  <span className="font-mono-code">{repoSlug}</span> branch status, GitHub Pages
-                  state, and committed files.
-                </p>
-              )}
-
               {repoInfo && (
                 <div className="space-y-4 pt-2">
                   <div className="grid grid-cols-4 gap-3 py-3 border-t border-b border-[#E5DFD3] dark:border-[#342E28]">
@@ -404,12 +329,6 @@ export function GitHubPagesStudio({
                       </p>
                     </div>
                   </div>
-
-                  {repoInfo.description && (
-                    <p className="text-xs text-[#44403C] dark:text-[#D6D3D1]">
-                      {repoInfo.description}
-                    </p>
-                  )}
 
                   {repoFiles.length > 0 && (
                     <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
@@ -456,34 +375,6 @@ export function GitHubPagesStudio({
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Individual Markdown Files Ready for Git Commit */}
-            <div className="space-y-3">
-              <h4 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
-                Stored Sayadaw Markdown Paths
-              </h4>
-              <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28] border-t border-b border-[#E5DFD3] dark:border-[#342E28] max-h-60 overflow-y-auto">
-                {discourses.map((d) => (
-                  <div key={d.id} className="py-2.5 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-[#1C1917] dark:text-[#F5F5F4] truncate">
-                        {d.title}
-                      </p>
-                      <p className="font-mono-code text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
-                        {d.repoPath}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => onExportMarkdown(d)}
-                      className="text-xs font-medium text-[#9A3412] dark:text-[#FDBA74] hover:underline whitespace-nowrap shrink-0 cursor-pointer"
-                    >
-                      Download .md
-                    </button>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>

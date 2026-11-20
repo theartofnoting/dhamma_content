@@ -48,7 +48,7 @@ export function HeroSection({
                 onClick={onEnterReadingRoom}
                 className="inline-flex items-center gap-2.5 min-h-[44px] px-6 py-2.5 text-sm font-medium text-[#FBF9F5] bg-[#1C1917] hover:bg-[#292524] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#E7E5E4] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9A3412]"
               >
-                <span>Open Reading Room</span>
+                <span>{totalDiscourses > 0 ? 'Open Reading Room' : 'Browse Archive'}</span>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </button>
 
@@ -101,7 +101,7 @@ export function HeroSection({
           </div>
           <div>
             <dt className="text-xs tracking-wider uppercase text-[#78716C] dark:text-[#A8A29E]">
-              {isOwner ? 'GitHub Pages Publishing' : 'Open Dhamma Archive'}
+              {isOwner ? 'Archive Publishing' : 'Open Dhamma Archive'}
             </dt>
             <dd className="mt-1.5">
               {isOwner ? (
