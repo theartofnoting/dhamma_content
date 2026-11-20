@@ -7,16 +7,16 @@ export type TraditionCollection =
 
 export type DiscourseLanguage =
   | 'Pāli · English'
-  | 'Pāli · 繁體中文 · English'
+  | 'Pāli · Vietnamese · English'
   | 'English'
-  | '繁體中文';
+  | 'Vietnamese';
 
 export interface SayadawProfile {
   id: string;
   slug?: string;
   name: string;
   honorificTitle: string;
-  chineseName?: string;
+  vietnameseName?: string;
   monastery: string;
   location: string;
   lineage: string;
@@ -63,7 +63,7 @@ export interface DhammaDiscourse {
   collectionSlug?: string;
   sourceFormat?: 'md' | 'rst';
   title: string;
-  chineseTitle?: string;
+  vietnameseTitle?: string;
   paliSubtitle?: string;
   sayadawId: string;
   sayadawName: string;
