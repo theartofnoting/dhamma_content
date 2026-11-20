@@ -26,14 +26,25 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 function unifiedContentPlugin(basePath: string): Plugin {
-  const contentRoot = path.resolve(__dirname, 'content');
+  const contentRoot = path.resolve(import.meta.dirname, 'content');
   const normalizedBase = basePath.replace(/\/+$/, '');
 
   return {
     name: 'unified-content-directory',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const rawUrl = (req.url || '').split('?')[0];
+        const [rawUrl, rawQuery = ''] = (req.url || '').split('?');
+        const queryParams = new URLSearchParams(rawQuery);
+        // Let Vite transform module imports such as ?import&raw or ?url
+        if (
+          queryParams.has('import') ||
+          queryParams.has('raw') ||
+          queryParams.has('url') ||
+          queryParams.has('inline') ||
+          queryParams.has('worker')
+        ) {
+          return next();
+        }
         let rel = rawUrl;
         if (normalizedBase && rel.startsWith(normalizedBase)) {
           rel = rel.slice(normalizedBase.length);
@@ -54,7 +65,7 @@ function unifiedContentPlugin(basePath: string): Plugin {
     },
     closeBundle(error?: Error) {
       if (error) return;
-      const distDir = path.resolve(__dirname, 'dist');
+      const distDir = path.resolve(import.meta.dirname, 'dist');
       const distContent = path.resolve(distDir, 'content');
       if (fs.existsSync(distDir) && fs.existsSync(contentRoot)) {
         fs.cpSync(contentRoot, distContent, {recursive: true, force: true});
@@ -80,8 +91,8 @@ export default defineConfig(() => {
           if (error) {
             return;
           }
-          const distDir = path.resolve(__dirname, 'dist');
-          const srcAssets = path.resolve(__dirname, 'src/assets');
+          const distDir = path.resolve(import.meta.dirname, 'dist');
+          const srcAssets = path.resolve(import.meta.dirname, 'src/assets');
           const distAssets = path.resolve(distDir, 'src/assets');
           if (fs.existsSync(distDir) && fs.existsSync(srcAssets)) {
             fs.cpSync(srcAssets, distAssets, {recursive: true, force: true});
@@ -91,7 +102,7 @@ export default defineConfig(() => {
     ],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
     server: {

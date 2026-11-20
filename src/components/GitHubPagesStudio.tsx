@@ -7,6 +7,15 @@ import {
   RefreshCw,
   UploadCloud,
 } from 'lucide-react';
+import { GITHUB_CONFIG } from '../config/siteConfig';
+import {
+  buildArchiveBackupPayload,
+  buildGitHubPagesWorkflowYml,
+} from '../content/exporters';
+import { fetchGitHubRepoSnapshot } from '../plugins/githubPublisher';
+import { SectionHeader } from '../theme/components/SectionHeader';
+import { THEME_CLASSES } from '../theme/uiClasses';
+import { triggerFileDownload } from '../tools/fileTools';
 import {
   DhammaDiscourse,
   GitHubContentEntry,
@@ -15,11 +24,6 @@ import {
   MeditationTip,
   SayadawProfile,
 } from '../types/dhamma';
-import {
-  fetchGitHubRepoSnapshot,
-  GITHUB_PAGES_WORKFLOW_YML,
-  triggerFileDownload,
-} from '../utils/storageAndExport';
 
 interface GitHubPagesStudioProps {
   sayadaws: SayadawProfile[];
@@ -36,9 +40,6 @@ interface GitHubPagesStudioProps {
   onExportMarkdown: (discourse: DhammaDiscourse) => void;
 }
 
-const DEFAULT_REPO_SLUG = 'theartofnoting/dhamma_content';
-const TARGET_PAGES_URL = 'https://theartofnoting.github.io/dhamma_content/';
-
 export function GitHubPagesStudio({
   sayadaws,
   discourses,
@@ -53,7 +54,7 @@ export function GitHubPagesStudio({
   onPublishToGitHub,
   onExportMarkdown,
 }: GitHubPagesStudioProps) {
-  const [repoSlug, setRepoSlug] = useState(DEFAULT_REPO_SLUG);
+  const [repoSlug, setRepoSlug] = useState<string>(GITHUB_CONFIG.repoSlug);
   const [repoInfo, setRepoInfo] = useState<GitHubRepoInfo | null>(null);
   const [repoFiles, setRepoFiles] = useState<GitHubContentEntry[]>([]);
   const [loadingRepo, setLoadingRepo] = useState(false);
@@ -76,21 +77,17 @@ export function GitHubPagesStudio({
   };
 
   const handleDownloadWorkflow = () => {
-    triggerFileDownload('pages.yml', GITHUB_PAGES_WORKFLOW_YML, 'text/yaml;charset=utf-8');
+    triggerFileDownload('pages.yml', buildGitHubPagesWorkflowYml(), 'text/yaml;charset=utf-8');
   };
 
   const handleDownloadArchiveJson = () => {
-    const payload = {
-      name: 'Vipassana Bhavana — Dhamma Page',
-      site: TARGET_PAGES_URL,
-      repository: `https://github.com/${repoSlug}`,
-      exportedAt: new Date().toISOString(),
-      license: 'CC BY-NC-SA 4.0 (Dhamma-dāna)',
+    const payload = buildArchiveBackupPayload({
+      repoSlug,
       sayadaws,
       discourses,
-      meditationTips: tips,
+      tips,
       events,
-    };
+    });
     triggerFileDownload(
       'dhamma-archive.json',
       JSON.stringify(payload, null, 2),
@@ -99,36 +96,30 @@ export function GitHubPagesStudio({
   };
 
   return (
-    <section
-      id="github-section"
-      className="border-t border-[#E5DFD3] dark:border-[#342E28] bg-[#F4EFE6]/45 dark:bg-[#1E1A16]"
-    >
-      <div className="mx-auto max-w-[1200px] px-4 py-14 sm:px-8 sm:py-16">
-        <div className="max-w-3xl space-y-2 pb-10 border-b border-[#E5DFD3] dark:border-[#342E28]">
-          <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
-            06. Archive Publishing &amp; Backups
-          </p>
-          <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] text-balance">
-            Publish &amp; Backup Archive
-          </h2>
-        </div>
+    <section id="github-section" className={THEME_CLASSES.band}>
+      <div className={THEME_CLASSES.sectionContainer}>
+        <SectionHeader
+          kicker="06. Archive Publishing & Backups"
+          title="Publish & Backup Archive"
+          bottomPaddingClassName="pb-10"
+        />
 
         {/* Publish Changes Card */}
-        <div className="mt-8 p-6 border border-[#D6CEBE] dark:border-[#342E28] bg-[#FBF9F5] dark:bg-[#181512] flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div
+          className={`mt-8 p-6 ${THEME_CLASSES.cardElevated} flex flex-col md:flex-row md:items-center justify-between gap-6`}
+        >
           <div className="space-y-1.5 max-w-2xl">
-            <p className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74]">
-              {repoSlug}
-            </p>
-            <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+            <p className={`font-mono-code text-xs ${THEME_CLASSES.accentInk}`}>{repoSlug}</p>
+            <h3 className={`font-display text-2xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
               Sync Browser Edits to GitHub
             </h3>
-            <p className="text-xs leading-relaxed text-[#57534E] dark:text-[#A8A29E] tabular-nums">
+            <p className={`text-xs leading-relaxed ${THEME_CLASSES.inkMuted} tabular-nums`}>
               {sayadaws.length} Sayadaw(s) · {discourses.length} discourse(s) · {tips.length} tip(s) ·{' '}
               {events.length} event(s)
               {pendingDeletionCount > 0 ? ` · ${pendingDeletionCount} file removal(s) queued` : ''}
             </p>
             {publishStatus && (
-              <p className="font-mono-code text-xs text-[#14532D] dark:text-[#86EFAC] pt-1">
+              <p className={`font-mono-code text-xs ${THEME_CLASSES.successInk} pt-1`}>
                 {publishStatus}
               </p>
             )}
@@ -138,7 +129,7 @@ export function GitHubPagesStudio({
                   href={lastActionsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[#9A3412] dark:text-[#FDBA74] underline"
+                  className={`inline-flex items-center gap-1 ${THEME_CLASSES.accentInk} underline`}
                 >
                   <span>Monitor GitHub Actions Deployment</span>
                   <ExternalLink className="h-3 w-3" aria-hidden="true" />
@@ -146,7 +137,7 @@ export function GitHubPagesStudio({
               </p>
             )}
             {publishError && (
-              <p role="alert" className="text-xs text-[#9A3412] dark:text-[#FCA5A5] pt-1">
+              <p role="alert" className={`text-xs ${THEME_CLASSES.dangerInk} pt-1`}>
                 {publishError}
               </p>
             )}
@@ -156,7 +147,7 @@ export function GitHubPagesStudio({
             type="button"
             onClick={onPublishToGitHub}
             disabled={isPublishing}
-            className="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-2.5 text-sm font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+            className={`${THEME_CLASSES.btnAccent} min-h-[44px] px-6 text-sm`}
           >
             <UploadCloud className="h-4 w-4" aria-hidden="true" />
             <span>
@@ -172,17 +163,17 @@ export function GitHubPagesStudio({
         <div className="pt-10 grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           {/* Left: Export Backups */}
           <div className="lg:col-span-6 space-y-6">
-            <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+            <h3 className={`font-display text-2xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
               Export Archive Backups
             </h3>
 
-            <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28] border-t border-b border-[#E5DFD3] dark:border-[#342E28]">
+            <div className={`${THEME_CLASSES.divideHairline} border-t border-b ${THEME_CLASSES.borderHairline}`}>
               <div className="py-4 flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-mono-code text-sm text-[#1C1917] dark:text-[#F5F5F4]">
+                  <p className={`font-mono-code text-sm ${THEME_CLASSES.inkPrimary}`}>
                     dhamma-archive.json
                   </p>
-                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E] tabular-nums">
+                  <p className={`text-xs ${THEME_CLASSES.inkMuted} tabular-nums`}>
                     Backup of {sayadaws.length} sayadaws, {discourses.length} discourses,{' '}
                     {tips.length} tips, and {events.length} events
                   </p>
@@ -190,7 +181,7 @@ export function GitHubPagesStudio({
                 <button
                   type="button"
                   onClick={handleDownloadArchiveJson}
-                  className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-medium bg-[#1C1917] text-[#FBF9F5] dark:bg-[#F5F5F4] dark:text-[#1C1917] hover:bg-[#9A3412] dark:hover:bg-[#FDBA74] cursor-pointer whitespace-nowrap shrink-0"
+                  className={THEME_CLASSES.btnPrimary}
                 >
                   <Download className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Export JSON</span>
@@ -199,17 +190,15 @@ export function GitHubPagesStudio({
 
               <div className="py-4 flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-mono-code text-sm text-[#1C1917] dark:text-[#F5F5F4]">
-                    pages.yml
-                  </p>
-                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                  <p className={`font-mono-code text-sm ${THEME_CLASSES.inkPrimary}`}>pages.yml</p>
+                  <p className={`text-xs ${THEME_CLASSES.inkMuted}`}>
                     GitHub Pages deployment workflow
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={handleDownloadWorkflow}
-                  className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
+                  className={THEME_CLASSES.btnOutline}
                 >
                   <Download className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>pages.yml</span>
@@ -219,24 +208,26 @@ export function GitHubPagesStudio({
 
             {discourses.length > 0 && (
               <div className="space-y-3 pt-2">
-                <h4 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+                <h4 className={`font-display text-xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
                   Download Individual Discourses
                 </h4>
-                <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28] border-t border-b border-[#E5DFD3] dark:border-[#342E28] max-h-60 overflow-y-auto">
+                <div
+                  className={`${THEME_CLASSES.divideHairline} border-t border-b ${THEME_CLASSES.borderHairline} max-h-60 overflow-y-auto`}
+                >
                   {discourses.map((d) => (
                     <div key={d.id} className="py-2.5 flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-[#1C1917] dark:text-[#F5F5F4] truncate">
+                        <p className={`text-xs font-medium ${THEME_CLASSES.inkPrimary} truncate`}>
                           {d.title}
                         </p>
-                        <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
+                        <p className={`text-[11px] ${THEME_CLASSES.inkSubtle} truncate`}>
                           {d.sayadawName}
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => onExportMarkdown(d)}
-                        className="text-xs font-medium text-[#9A3412] dark:text-[#FDBA74] hover:underline whitespace-nowrap shrink-0 cursor-pointer"
+                        className={`text-xs font-medium ${THEME_CLASSES.accentInk} hover:underline whitespace-nowrap shrink-0 cursor-pointer`}
                       >
                         Download .md
                       </button>
@@ -249,13 +240,13 @@ export function GitHubPagesStudio({
 
           {/* Right: Live GitHub Repo Inspector */}
           <div className="lg:col-span-6">
-            <div className="p-6 border border-[#E5DFD3] dark:border-[#342E28] bg-[#FBF9F5] dark:bg-[#181512] space-y-4">
+            <div className={`p-6 border ${THEME_CLASSES.borderHairline} bg-[var(--surface-canvas)] space-y-4`}>
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+                  <h3 className={`font-display text-2xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
                     Repository Inspector
                   </h3>
-                  <p className="font-mono-code text-xs text-[#78716C] dark:text-[#A8A29E]">
+                  <p className={`font-mono-code text-xs ${THEME_CLASSES.inkSubtle}`}>
                     github.com/{repoSlug}
                   </p>
                 </div>
@@ -264,7 +255,7 @@ export function GitHubPagesStudio({
                   type="button"
                   onClick={handleFetchRepo}
                   disabled={loadingRepo}
-                  className="inline-flex items-center gap-2 min-h-[40px] px-4 py-2 text-xs font-medium border border-[#1C1917] dark:border-[#E7E5E4] text-[#1C1917] dark:text-[#F5F5F4] hover:bg-[#1C1917] hover:text-[#FBF9F5] dark:hover:bg-[#F5F5F4] dark:hover:text-[#1C1917] transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+                  className={THEME_CLASSES.btnOutline}
                 >
                   <RefreshCw
                     className={`h-3.5 w-3.5 ${loadingRepo ? 'animate-spin' : ''}`}
@@ -280,51 +271,48 @@ export function GitHubPagesStudio({
                   value={repoSlug}
                   onChange={(e) => setRepoSlug(e.target.value)}
                   aria-label="GitHub repository owner/name"
-                  className="flex-1 min-h-[38px] px-3 py-1.5 font-mono-code text-xs bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
+                  className={THEME_CLASSES.inputMono}
                 />
               </div>
 
               {repoError && (
-                <div
-                  role="alert"
-                  className="p-3.5 border border-[#9A3412]/40 bg-[#9A3412]/5 text-xs text-[#9A3412] dark:text-[#FCA5A5]"
-                >
+                <div role="alert" className={THEME_CLASSES.alertError}>
                   {repoError}
                 </div>
               )}
 
               {repoInfo && (
                 <div className="space-y-4 pt-2">
-                  <div className="grid grid-cols-4 gap-3 py-3 border-t border-b border-[#E5DFD3] dark:border-[#342E28]">
+                  <div className={`grid grid-cols-4 gap-3 py-3 border-t border-b ${THEME_CLASSES.borderHairline}`}>
                     <div>
-                      <p className="text-[11px] uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
+                      <p className={`text-[11px] uppercase tracking-wider ${THEME_CLASSES.inkSubtle}`}>
                         Branch
                       </p>
-                      <p className="font-mono-code text-sm text-[#1C1917] dark:text-[#F5F5F4]">
+                      <p className={`font-mono-code text-sm ${THEME_CLASSES.inkPrimary}`}>
                         {repoInfo.default_branch}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
+                      <p className={`text-[11px] uppercase tracking-wider ${THEME_CLASSES.inkSubtle}`}>
                         Pages
                       </p>
-                      <p className="font-mono-code text-sm text-[#1C1917] dark:text-[#F5F5F4]">
+                      <p className={`font-mono-code text-sm ${THEME_CLASSES.inkPrimary}`}>
                         {repoInfo.has_pages ? 'Active' : 'Pending'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
+                      <p className={`text-[11px] uppercase tracking-wider ${THEME_CLASSES.inkSubtle}`}>
                         Stars
                       </p>
-                      <p className="font-mono-code text-sm text-[#1C1917] dark:text-[#F5F5F4] tabular-nums">
+                      <p className={`font-mono-code text-sm ${THEME_CLASSES.inkPrimary} tabular-nums`}>
                         {repoInfo.stargazers_count}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
+                      <p className={`text-[11px] uppercase tracking-wider ${THEME_CLASSES.inkSubtle}`}>
                         Last Push
                       </p>
-                      <p className="font-mono-code text-sm text-[#1C1917] dark:text-[#F5F5F4] tabular-nums">
+                      <p className={`font-mono-code text-sm ${THEME_CLASSES.inkPrimary} tabular-nums`}>
                         {new Date(repoInfo.pushed_at).toLocaleDateString()}
                       </p>
                     </div>
@@ -335,17 +323,17 @@ export function GitHubPagesStudio({
                       {repoFiles.map((entry) => (
                         <div
                           key={entry.path}
-                          className="flex items-center justify-between py-1.5 text-xs border-b border-[#E5DFD3]/60 dark:border-[#342E28]/60"
+                          className={`flex items-center justify-between py-1.5 text-xs border-b ${THEME_CLASSES.borderHairline}`}
                         >
-                          <span className="inline-flex items-center gap-2 font-mono-code text-[#292524] dark:text-[#E7E5E4]">
+                          <span className={`inline-flex items-center gap-2 font-mono-code ${THEME_CLASSES.inkBody}`}>
                             {entry.type === 'dir' ? (
-                              <Folder className="h-3.5 w-3.5 text-[#9A3412] dark:text-[#FDBA74]" />
+                              <Folder className={`h-3.5 w-3.5 ${THEME_CLASSES.accentInk}`} />
                             ) : (
-                              <FileText className="h-3.5 w-3.5 text-[#78716C]" />
+                              <FileText className={`h-3.5 w-3.5 ${THEME_CLASSES.inkSubtle}`} />
                             )}
                             <span>{entry.name}</span>
                           </span>
-                          <span className="font-mono-code text-[11px] text-[#78716C] tabular-nums">
+                          <span className={`font-mono-code text-[11px] ${THEME_CLASSES.inkSubtle} tabular-nums`}>
                             {entry.type === 'dir' ? 'dir' : `${entry.size} B`}
                           </span>
                         </div>
@@ -358,18 +346,18 @@ export function GitHubPagesStudio({
                       href={repoInfo.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[#9A3412] dark:text-[#FDBA74] hover:underline"
+                      className={`inline-flex items-center gap-1 ${THEME_CLASSES.accentInk} hover:underline`}
                     >
                       <span>{repoInfo.full_name}</span>
                       <ExternalLink className="h-3 w-3" aria-hidden="true" />
                     </a>
                     <a
-                      href={TARGET_PAGES_URL}
+                      href={GITHUB_CONFIG.pagesUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[#44403C] dark:text-[#D6D3D1] hover:underline"
+                      className={`inline-flex items-center gap-1 ${THEME_CLASSES.inkSecondary} hover:underline`}
                     >
-                      <span>theartofnoting.github.io/dhamma_content</span>
+                      <span>{GITHUB_CONFIG.pagesHost}</span>
                       <ExternalLink className="h-3 w-3" aria-hidden="true" />
                     </a>
                   </div>

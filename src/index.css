@@ -1,16 +1,13 @@
 @import "tailwindcss";
+@import "./theme/tokens.css";
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
-  :root {
-    --font-display: "Cormorant Garamond", "Noto Serif TC", Georgia, serif;
-    --font-body: "Source Serif 4", "Noto Serif TC", Georgia, serif;
-    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
-  }
-
   html {
     font-family: var(--font-body);
     scroll-behavior: smooth;
+    background-color: var(--surface-canvas);
+    color: var(--ink-primary);
   }
 
   h1, h2, h3, .font-display {

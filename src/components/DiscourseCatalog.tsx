@@ -10,17 +10,20 @@ import {
   Plus,
   Search,
   Sun,
-  Trash2,
   X,
 } from 'lucide-react';
+import { SECTION_IDS, TAXONOMY } from '../config/siteConfig';
+import { buildDiscoursePath } from '../plugins/urlRouter';
+import { ConfirmDeleteAction } from '../theme/components/ConfirmDeleteAction';
+import { SectionHeader } from '../theme/components/SectionHeader';
+import { THEME_CLASSES } from '../theme/uiClasses';
+import { calculateEstimatedReadingMinutes } from '../tools/readingTime';
 import {
   DhammaDiscourse,
   DiscourseLanguage,
   SayadawProfile,
   TraditionCollection,
 } from '../types/dhamma';
-import { calculateEstimatedReadingMinutes } from '../utils/storageAndExport';
-import { buildDiscoursePath } from '../utils/urlRouter';
 import { ArchivalImage } from './ArchivalImage';
 
 interface DiscourseCatalogProps {
@@ -48,22 +51,163 @@ interface DiscourseCatalogProps {
   onOpenStoreModal: (presetSayadawId?: string) => void;
 }
 
-const COLLECTIONS: (TraditionCollection | 'All')[] = [
-  'All',
-  'Abhidhamma',
-  'Satipatthana & Vipassana',
-  'Sutta Pitaka',
-  'Visuddhimagga',
-  'Monastic Talks',
-];
+const COLLECTION_FILTERS: (TraditionCollection | 'All')[] = ['All', ...TAXONOMY.collections];
+const LANGUAGE_FILTERS: (DiscourseLanguage | 'All')[] = ['All', ...TAXONOMY.languages];
 
-const LANGUAGES: (DiscourseLanguage | 'All')[] = [
-  'All',
-  'Pāli · 繁體中文 · English',
-  'Pāli · English',
-  'English',
-  '繁體中文',
-];
+interface CatalogueRowProps {
+  discourse: DhammaDiscourse;
+  sayadaws: SayadawProfile[];
+  estMinutes: number;
+  isSaved: boolean;
+  isOwner: boolean;
+  isConfirmingDelete: boolean;
+  showSayadawColumn: boolean;
+  onSelectDiscourse: (id: string) => void;
+  onSayadawChange: (id: string) => void;
+  onToggleBookmark: (id: string) => void;
+  onExportMarkdown: (d: DhammaDiscourse) => void;
+  onEditDiscourse: (d: DhammaDiscourse) => void;
+  onRequestDelete: (id: string) => void;
+  onConfirmDelete: (id: string) => void;
+  onCancelDelete: () => void;
+}
+
+function CatalogueRow({
+  discourse: d,
+  sayadaws,
+  estMinutes,
+  isSaved,
+  isOwner,
+  isConfirmingDelete,
+  showSayadawColumn,
+  onSelectDiscourse,
+  onSayadawChange,
+  onToggleBookmark,
+  onExportMarkdown,
+  onEditDiscourse,
+  onRequestDelete,
+  onConfirmDelete,
+  onCancelDelete,
+}: CatalogueRowProps) {
+  const hasMedia = Boolean(d.audioReferenceUrl || (d.mediaItems && d.mediaItems.length > 0));
+
+  return (
+    <div
+      className={`${showSayadawColumn ? 'py-5' : 'py-4'} grid grid-cols-1 lg:grid-cols-12 gap-4 items-start lg:items-center hover:bg-[var(--surface-band)] transition-colors px-2 -mx-2`}
+    >
+      <div className="lg:col-span-2 flex items-center gap-2">
+        <span className={`font-mono-code text-xs ${THEME_CLASSES.accentInk} tabular-nums`}>
+          {d.accessionCode}
+        </span>
+      </div>
+
+      <div className={`${showSayadawColumn ? 'lg:col-span-4' : 'lg:col-span-5'} space-y-1`}>
+        <button
+          type="button"
+          onClick={() => onSelectDiscourse(d.id)}
+          className={`text-left font-display text-xl font-semibold ${THEME_CLASSES.inkPrimary} hover:text-[var(--accent-ink)] transition-colors cursor-pointer`}
+        >
+          {d.title}
+        </button>
+        <div className={`flex flex-wrap items-center gap-2 text-xs ${THEME_CLASSES.inkMuted}`}>
+          {d.chineseTitle && <span>{d.chineseTitle}</span>}
+          {d.chineseTitle && <span aria-hidden="true">·</span>}
+          <span>{d.sourceText}</span>
+        </div>
+        {showSayadawColumn && (
+          <p className={`font-mono-code text-[11px] ${THEME_CLASSES.inkSubtle} truncate`}>
+            {buildDiscoursePath(d, sayadaws)}
+          </p>
+        )}
+      </div>
+
+      <div
+        className={`${showSayadawColumn ? 'lg:col-span-3' : 'lg:col-span-2'} text-xs ${THEME_CLASSES.inkMuted} space-y-0.5`}
+      >
+        {showSayadawColumn && (
+          <p>
+            <button
+              type="button"
+              onClick={() => onSayadawChange(d.sayadawId)}
+              className={`font-medium ${THEME_CLASSES.inkBody} hover:text-[var(--accent-ink)] hover:underline underline-offset-4 cursor-pointer text-left`}
+            >
+              {d.sayadawName}
+            </button>
+          </p>
+        )}
+        <p className="inline-flex flex-wrap items-center gap-1.5">
+          <span>{d.collection}</span>
+          <span aria-hidden="true">·</span>
+          <span className={`inline-flex items-center gap-1 tabular-nums ${THEME_CLASSES.accentInk}`}>
+            <Clock className="h-3 w-3" aria-hidden="true" />
+            <span>{estMinutes} {showSayadawColumn ? 'min read' : 'min'}</span>
+          </span>
+          {hasMedia && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className={`inline-flex items-center gap-1 ${THEME_CLASSES.inkMuted}`}>
+                <Headphones className="h-3 w-3" aria-hidden="true" />
+                <span>Media</span>
+              </span>
+            </>
+          )}
+        </p>
+      </div>
+
+      <div className="lg:col-span-3 flex items-center lg:justify-end gap-1.5">
+        {isOwner && (
+          <>
+            {!isConfirmingDelete && (
+              <button
+                type="button"
+                onClick={() => onEditDiscourse(d)}
+                aria-label={`Edit ${d.title}`}
+                className={`min-h-[40px] min-w-[40px] inline-flex items-center justify-center ${THEME_CLASSES.inkMuted} hover:text-[var(--accent-ink)] cursor-pointer`}
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+            <ConfirmDeleteAction
+              variant="icon"
+              isConfirming={isConfirmingDelete}
+              onRequestConfirm={() => onRequestDelete(d.id)}
+              onConfirm={() => onConfirmDelete(d.id)}
+              onCancel={onCancelDelete}
+              ariaLabel={`Delete ${d.title}`}
+            />
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => onToggleBookmark(d.id)}
+          aria-label={isSaved ? `Remove ${d.title} from shelf` : `Save ${d.title} to shelf`}
+          className={`min-h-[40px] min-w-[40px] inline-flex items-center justify-center ${THEME_CLASSES.inkMuted} hover:text-[var(--accent-ink)] cursor-pointer`}
+        >
+          <Bookmark
+            className={`h-4 w-4 ${
+              isSaved ? 'fill-[var(--accent-ink)] text-[var(--accent-ink)]' : ''
+            }`}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => onExportMarkdown(d)}
+          aria-label={`Export ${d.title} as Markdown`}
+          className={`min-h-[40px] min-w-[40px] inline-flex items-center justify-center ${THEME_CLASSES.inkMuted} hover:text-[var(--ink-primary)] cursor-pointer`}
+        >
+          <Download className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onSelectDiscourse(d.id)}
+          className={`min-h-[40px] px-3.5 py-1.5 text-xs font-medium border ${THEME_CLASSES.borderStrong} ${THEME_CLASSES.inkPrimary} hover:border-[var(--accent-ink)] hover:text-[var(--accent-ink)] transition-colors cursor-pointer whitespace-nowrap shrink-0`}
+        >
+          Read
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function DiscourseCatalog({
   discourses,
@@ -164,7 +308,10 @@ export function DiscourseCatalog({
   );
 
   const groupedBySayadaw = useMemo(() => {
-    const groups = new Map<string, { sayadawId: string; sayadawName: string; items: DhammaDiscourse[] }>();
+    const groups = new Map<
+      string,
+      { sayadawId: string; sayadawName: string; items: DhammaDiscourse[] }
+    >();
     for (const d of filtered) {
       const existing = groups.get(d.sayadawId);
       if (existing) {
@@ -194,7 +341,9 @@ export function DiscourseCatalog({
     : undefined;
 
   const secondaryDiscourses = isDefaultUnfiltered
-    ? filtered.filter((d) => d.id !== leadDiscourse?.id && d.featuredRank === 'secondary').slice(0, 2)
+    ? filtered
+        .filter((d) => d.id !== leadDiscourse?.id && d.featuredRank === 'secondary')
+        .slice(0, 2)
     : [];
 
   const handleResetFilters = () => {
@@ -207,121 +356,72 @@ export function DiscourseCatalog({
     if (onlySaved) onToggleOnlySaved();
   };
 
-  const renderOwnerActions = (d: DhammaDiscourse) => {
-    if (!isOwner) return null;
-    if (confirmDeleteId === d.id) {
-      return (
-        <span className="inline-flex items-center gap-1.5 text-xs">
-          <button
-            type="button"
-            onClick={() => {
-              onDeleteDiscourse(d.id);
-              setConfirmDeleteId(null);
-            }}
-            className="min-h-[34px] px-2.5 bg-[#9A3412] text-[#FBF9F5] font-medium cursor-pointer whitespace-nowrap"
-          >
-            Confirm
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmDeleteId(null)}
-            className="min-h-[34px] px-2 text-[#57534E] dark:text-[#A8A29E] cursor-pointer"
-          >
-            Cancel
-          </button>
-        </span>
-      );
-    }
-    return (
-      <>
-        <button
-          type="button"
-          onClick={() => onEditDiscourse(d)}
-          aria-label={`Edit ${d.title}`}
-          className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
-        >
-          <Pencil className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setConfirmDeleteId(d.id)}
-          aria-label={`Delete ${d.title}`}
-          className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FCA5A5] cursor-pointer"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </>
-    );
-  };
-
   return (
-    <section id="catalog-section" className="mx-auto max-w-[1200px] px-4 py-12 sm:px-8 sm:py-16">
-      {/* Section Heading & Theme Switch */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-[#E5DFD3] dark:border-[#342E28]">
-        <div className="space-y-2">
-          <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
-            01. Archival Collection
-          </p>
-          <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] text-balance">
-            Sayadaw Discourses &amp; Study Index
-          </h2>
-        </div>
+    <section
+      id={SECTION_IDS.discourses}
+      className="mx-auto max-w-[1200px] px-4 py-12 sm:px-8 sm:py-16"
+    >
+      <SectionHeader
+        kicker="01. Archival Collection"
+        title="Sayadaw Discourses & Study Index"
+        actions={
+          <>
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenStoreModal(selectedSayadawId !== 'All' ? selectedSayadawId : undefined)
+                }
+                className={THEME_CLASSES.btnAccent}
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Add Discourse</span>
+              </button>
+            )}
 
-        <div className="flex flex-wrap items-center gap-3">
-          {isOwner && (
             <button
               type="button"
-              onClick={() =>
-                onOpenStoreModal(selectedSayadawId !== 'All' ? selectedSayadawId : undefined)
-              }
-              className="inline-flex items-center gap-1.5 min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] dark:bg-[#B45309] dark:hover:bg-[#92400E] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer"
+              onClick={onToggleOnlySaved}
+              className={`inline-flex items-center gap-2 min-h-[40px] px-4 py-2 text-xs font-medium border transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer ${
+                onlySaved
+                  ? 'bg-[var(--accent-primary)] text-[var(--accent-contrast)] border-[var(--accent-primary)]'
+                  : `bg-transparent ${THEME_CLASSES.inkSecondary} ${THEME_CLASSES.borderStrong} hover:border-[var(--accent-ink)]`
+              }`}
             >
-              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Add Discourse</span>
+              <Bookmark className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="tabular-nums">Saved Shelf ({bookmarks.length})</span>
             </button>
-          )}
 
-          <button
-            type="button"
-            onClick={onToggleOnlySaved}
-            className={`inline-flex items-center gap-2 min-h-[40px] px-4 py-2 text-xs font-medium border transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer ${
-              onlySaved
-                ? 'bg-[#9A3412] text-[#FBF9F5] border-[#9A3412] dark:bg-[#B45309] dark:border-[#B45309]'
-                : 'bg-transparent text-[#44403C] dark:text-[#D6D3D1] border-[#D6CEBE] dark:border-[#44403C] hover:border-[#9A3412]'
-            }`}
-          >
-            <Bookmark className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="tabular-nums">Saved Shelf ({bookmarks.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onToggleDarkMode}
-            className="inline-flex items-center gap-2 min-h-[40px] px-4 py-2 text-xs font-medium text-[#44403C] dark:text-[#D6D3D1] border border-[#D6CEBE] dark:border-[#44403C] hover:border-[#9A3412] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer"
-            aria-label={darkMode ? 'Switch to Archival Paper light theme' : 'Switch to Warm Night dark theme'}
-          >
-            {darkMode ? (
-              <>
-                <Sun className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Archival Paper</span>
-              </>
-            ) : (
-              <>
-                <Moon className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Warm Night</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              onClick={onToggleDarkMode}
+              className={`inline-flex items-center gap-2 min-h-[40px] px-4 py-2 text-xs font-medium ${THEME_CLASSES.inkSecondary} border ${THEME_CLASSES.borderStrong} hover:border-[var(--accent-ink)] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer`}
+              aria-label={
+                darkMode ? 'Switch to Archival Paper light theme' : 'Switch to Warm Night dark theme'
+              }
+            >
+              {darkMode ? (
+                <>
+                  <Sun className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Archival Paper</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Warm Night</span>
+                </>
+              )}
+            </button>
+          </>
+        }
+      />
 
       {/* Interactive Filter & Search Controls */}
-      <div className="py-6 space-y-5 border-b border-[#E5DFD3] dark:border-[#342E28]">
+      <div className={`py-6 space-y-5 border-b ${THEME_CLASSES.borderHairline}`}>
         <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
-          {/* Search box */}
           <div className="relative flex-1 max-w-xl">
             <Search
-              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#78716C]"
+              className={`pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 ${THEME_CLASSES.inkSubtle}`}
               aria-hidden="true"
             />
             <input
@@ -330,27 +430,26 @@ export function DiscourseCatalog({
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search titles, Sayadaw, Chinese terms, or Sutta reference..."
               aria-label="Search Dhamma archive"
-              className="w-full min-h-[44px] pl-10 pr-10 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] placeholder:text-[#78716C] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412] dark:focus:border-[#D97757]"
+              className={`w-full min-h-[44px] pl-10 pr-10 py-2 text-sm bg-[var(--surface-input)] ${THEME_CLASSES.inkPrimary} placeholder:text-[var(--ink-subtle)] border ${THEME_CLASSES.borderStrong} focus:outline-none focus:border-[var(--accent-ink)]`}
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => onSearchChange('')}
                 aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 ${THEME_CLASSES.inkSubtle} hover:text-[var(--ink-primary)] cursor-pointer`}
               >
                 <X className="h-4 w-4" />
               </button>
             )}
           </div>
 
-          {/* Sayadaw & Language Selectors */}
           <div className="flex flex-wrap items-center gap-3">
             <select
               value={selectedSayadawId}
               onChange={(e) => onSayadawChange(e.target.value)}
               aria-label="Filter by Sayadaw"
-              className="min-h-[44px] px-3.5 py-2 text-sm bg-[#FBF9F5] dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412] cursor-pointer"
+              className={`min-h-[44px] px-3.5 py-2 text-sm bg-[var(--surface-canvas)] ${THEME_CLASSES.inkPrimary} border ${THEME_CLASSES.borderStrong} focus:outline-none focus:border-[var(--accent-ink)] cursor-pointer`}
             >
               <option value="All">All Sayadaw Masters</option>
               {sayadaws.map((s) => (
@@ -364,9 +463,9 @@ export function DiscourseCatalog({
               value={selectedLanguage}
               onChange={(e) => onLanguageChange(e.target.value as DiscourseLanguage | 'All')}
               aria-label="Filter by Language"
-              className="min-h-[44px] px-3.5 py-2 text-sm bg-[#FBF9F5] dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412] cursor-pointer"
+              className={`min-h-[44px] px-3.5 py-2 text-sm bg-[var(--surface-canvas)] ${THEME_CLASSES.inkPrimary} border ${THEME_CLASSES.borderStrong} focus:outline-none focus:border-[var(--accent-ink)] cursor-pointer`}
             >
-              {LANGUAGES.map((lang) => (
+              {LANGUAGE_FILTERS.map((lang) => (
                 <option key={lang} value={lang}>
                   {lang === 'All' ? 'All Scripts & Languages' : lang}
                 </option>
@@ -379,7 +478,7 @@ export function DiscourseCatalog({
                 setSortByTime(e.target.value as 'default' | 'shortest' | 'longest')
               }
               aria-label="Sort by estimated reading time"
-              className="min-h-[44px] px-3.5 py-2 text-sm bg-[#FBF9F5] dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412] cursor-pointer"
+              className={`min-h-[44px] px-3.5 py-2 text-sm bg-[var(--surface-canvas)] ${THEME_CLASSES.inkPrimary} border ${THEME_CLASSES.borderStrong} focus:outline-none focus:border-[var(--accent-ink)] cursor-pointer`}
             >
               <option value="default">Archive Order</option>
               <option value="shortest">Shortest Study First</option>
@@ -392,8 +491,8 @@ export function DiscourseCatalog({
               aria-pressed={groupBySayadaw}
               className={`inline-flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 text-xs font-medium border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 groupBySayadaw
-                  ? 'border-[#9A3412] bg-[#9A3412] text-[#FBF9F5] dark:border-[#B45309] dark:bg-[#B45309]'
-                  : 'border-[#D6CEBE] dark:border-[#3F3832] bg-[#FBF9F5] dark:bg-[#221E1A] text-[#44403C] dark:text-[#D6D3D1] hover:border-[#9A3412]'
+                  ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--accent-contrast)]'
+                  : `${THEME_CLASSES.borderStrong} bg-[var(--surface-canvas)] ${THEME_CLASSES.inkSecondary} hover:border-[var(--accent-ink)]`
               }`}
             >
               <Layers className="h-3.5 w-3.5" aria-hidden="true" />
@@ -404,7 +503,7 @@ export function DiscourseCatalog({
 
         {/* Index by Sayadaw Bar */}
         <div className="space-y-2">
-          <p className="text-[11px] tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
+          <p className={`text-[11px] tracking-widest uppercase ${THEME_CLASSES.inkSubtle}`}>
             Index by Sayadaw
           </p>
           <div
@@ -419,8 +518,8 @@ export function DiscourseCatalog({
               onClick={() => onSayadawChange('All')}
               className={`min-h-[36px] px-3 py-1.5 text-xs font-medium transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer border ${
                 selectedSayadawId === 'All'
-                  ? 'border-[#9A3412] bg-[#9A3412] text-[#FBF9F5] dark:border-[#B45309] dark:bg-[#B45309]'
-                  : 'border-[#E5DFD3] dark:border-[#342E28] bg-[#FBF9F5] dark:bg-[#221E1A] text-[#57534E] dark:text-[#A8A29E] hover:border-[#9A3412] hover:text-[#1C1917] dark:hover:text-[#F5F5F4]'
+                  ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--accent-contrast)]'
+                  : `${THEME_CLASSES.borderHairline} bg-[var(--surface-canvas)] ${THEME_CLASSES.inkMuted} hover:border-[var(--accent-ink)] hover:text-[var(--ink-primary)]`
               }`}
             >
               <span className="tabular-nums">All Sayadaws ({discourses.length})</span>
@@ -437,8 +536,8 @@ export function DiscourseCatalog({
                   onClick={() => onSayadawChange(s.id)}
                   className={`min-h-[36px] px-3 py-1.5 text-xs font-medium transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer border ${
                     active
-                      ? 'border-[#9A3412] bg-[#9A3412] text-[#FBF9F5] dark:border-[#B45309] dark:bg-[#B45309]'
-                      : 'border-[#E5DFD3] dark:border-[#342E28] bg-[#FBF9F5] dark:bg-[#221E1A] text-[#57534E] dark:text-[#A8A29E] hover:border-[#9A3412] hover:text-[#1C1917] dark:hover:text-[#F5F5F4]'
+                      ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--accent-contrast)]'
+                      : `${THEME_CLASSES.borderHairline} bg-[var(--surface-canvas)] ${THEME_CLASSES.inkMuted} hover:border-[var(--accent-ink)] hover:text-[var(--ink-primary)]`
                   }`}
                 >
                   <span className="tabular-nums">
@@ -456,7 +555,7 @@ export function DiscourseCatalog({
           aria-label="Filter by Dhamma collection"
           className="flex items-center gap-1.5 overflow-x-auto pb-1"
         >
-          {COLLECTIONS.map((col) => {
+          {COLLECTION_FILTERS.map((col) => {
             const active = selectedCollection === col;
             return (
               <button
@@ -467,8 +566,8 @@ export function DiscourseCatalog({
                 onClick={() => onCollectionChange(col)}
                 className={`min-h-[40px] px-3.5 py-1.5 text-xs font-medium transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer ${
                   active
-                    ? 'bg-[#1C1917] text-[#FBF9F5] dark:bg-[#F5F5F4] dark:text-[#1C1917]'
-                    : 'bg-[#F4EFE6] text-[#57534E] hover:text-[#1C1917] dark:bg-[#25211D] dark:text-[#A8A29E] dark:hover:text-[#F5F5F4]'
+                    ? 'bg-[var(--ink-primary)] text-[var(--surface-canvas)]'
+                    : `bg-[var(--surface-muted)] ${THEME_CLASSES.inkMuted} hover:text-[var(--ink-primary)]`
                 }`}
               >
                 {col === 'All' ? 'All Collections' : col}
@@ -480,19 +579,15 @@ export function DiscourseCatalog({
 
       {/* Empty State */}
       {filtered.length === 0 ? (
-        <div className="py-16 text-center space-y-4 border-b border-[#E5DFD3] dark:border-[#342E28]">
-          <p className="font-display text-2xl font-medium text-[#1C1917] dark:text-[#F5F5F4]">
+        <div className={`py-16 text-center space-y-4 border-b ${THEME_CLASSES.borderHairline}`}>
+          <p className={`font-display text-2xl font-medium ${THEME_CLASSES.inkPrimary}`}>
             {discourses.length === 0
               ? 'No discourses in the archive yet'
               : 'No matching Sayadaw discourses found'}
           </p>
           <div className="flex items-center justify-center gap-3 pt-2">
             {discourses.length > 0 && (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="min-h-[40px] px-4 py-2 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer"
-              >
+              <button type="button" onClick={handleResetFilters} className={THEME_CLASSES.btnOutline}>
                 Reset Filters
               </button>
             )}
@@ -502,7 +597,7 @@ export function DiscourseCatalog({
                 onClick={() =>
                   onOpenStoreModal(selectedSayadawId !== 'All' ? selectedSayadawId : undefined)
                 }
-                className="min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] cursor-pointer"
+                className={THEME_CLASSES.btnAccent}
               >
                 Add Discourse
               </button>
@@ -513,7 +608,7 @@ export function DiscourseCatalog({
         <>
           {/* Tier 1 & Tier 2 Featured Editorial Grid */}
           {leadDiscourse && (
-            <div className="py-10 border-b border-[#E5DFD3] dark:border-[#342E28] space-y-12">
+            <div className={`py-10 border-b ${THEME_CLASSES.borderHairline} space-y-12`}>
               <article className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
                 <div className="lg:col-span-6">
                   <ArchivalImage
@@ -525,8 +620,8 @@ export function DiscourseCatalog({
                 </div>
                 <div className="lg:col-span-6 flex flex-col justify-between gap-6 py-1">
                   <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-[#78716C] dark:text-[#A8A29E]">
-                      <span className="font-mono-code text-[#9A3412] dark:text-[#FDBA74]">
+                    <div className={`flex flex-wrap items-center gap-2 text-xs ${THEME_CLASSES.inkSubtle}`}>
+                      <span className={`font-mono-code ${THEME_CLASSES.accentInk}`}>
                         {leadDiscourse.accessionCode}
                       </span>
                       <span aria-hidden="true">·</span>
@@ -536,43 +631,47 @@ export function DiscourseCatalog({
                       <span aria-hidden="true">·</span>
                       <span className="inline-flex items-center gap-1 tabular-nums">
                         <Clock className="h-3 w-3" aria-hidden="true" />
-                        <span>{readingTimesById.get(leadDiscourse.id) ?? leadDiscourse.readingMinutes} min read</span>
+                        <span>
+                          {readingTimesById.get(leadDiscourse.id) ?? leadDiscourse.readingMinutes} min read
+                        </span>
                       </span>
                     </div>
 
-                    <h3 className="font-display text-3xl sm:text-[2.25rem] font-semibold leading-[1.18] text-[#1C1917] dark:text-[#F5F5F4] text-balance">
+                    <h3
+                      className={`font-display text-3xl sm:text-[2.25rem] font-semibold leading-[1.18] ${THEME_CLASSES.inkPrimary} text-balance`}
+                    >
                       <button
                         type="button"
                         onClick={() => onSelectDiscourse(leadDiscourse.id)}
-                        className="text-left hover:text-[#9A3412] dark:hover:text-[#FDBA74] transition-colors cursor-pointer"
+                        className="text-left hover:text-[var(--accent-ink)] transition-colors cursor-pointer"
                       >
                         {leadDiscourse.title}
                       </button>
                     </h3>
 
                     {leadDiscourse.chineseTitle && (
-                      <p className="text-base font-medium text-[#57534E] dark:text-[#D6D3D1]">
+                      <p className={`text-base font-medium ${THEME_CLASSES.inkMuted}`}>
                         {leadDiscourse.chineseTitle}
                       </p>
                     )}
 
-                    <p className="text-sm font-medium text-[#292524] dark:text-[#E7E5E4]">
+                    <p className={`text-sm font-medium ${THEME_CLASSES.inkBody}`}>
                       <button
                         type="button"
                         onClick={() => onSayadawChange(leadDiscourse.sayadawId)}
-                        className="hover:text-[#9A3412] dark:hover:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer"
+                        className="hover:text-[var(--accent-ink)] hover:underline underline-offset-4 cursor-pointer"
                       >
                         {leadDiscourse.sayadawName}
                       </button>
-                      <span className="mx-2 text-[#A8A29E]" aria-hidden="true">
+                      <span className={`mx-2 ${THEME_CLASSES.inkSubtle}`} aria-hidden="true">
                         ·
                       </span>
-                      <span className="font-normal text-[#57534E] dark:text-[#A8A29E]">
+                      <span className={`font-normal ${THEME_CLASSES.inkMuted}`}>
                         {leadDiscourse.sourceText}
                       </span>
                     </p>
 
-                    <p className="text-[0.975rem] leading-[1.7] text-[#44403C] dark:text-[#D6D3D1]">
+                    <p className={`text-[0.975rem] leading-[1.7] ${THEME_CLASSES.inkSecondary}`}>
                       {leadDiscourse.summary}
                     </p>
                   </div>
@@ -581,7 +680,7 @@ export function DiscourseCatalog({
                     <button
                       type="button"
                       onClick={() => onSelectDiscourse(leadDiscourse.id)}
-                      className="min-h-[40px] px-5 py-2 text-sm font-medium bg-[#1C1917] text-[#FBF9F5] hover:bg-[#9A3412] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#FDBA74] transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                      className={THEME_CLASSES.btnPrimary}
                     >
                       Read Discourse
                     </button>
@@ -589,12 +688,12 @@ export function DiscourseCatalog({
                     <button
                       type="button"
                       onClick={() => onToggleBookmark(leadDiscourse.id)}
-                      className="inline-flex items-center gap-1.5 min-h-[40px] px-3 py-2 text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer whitespace-nowrap shrink-0"
+                      className={`inline-flex items-center gap-1.5 min-h-[40px] px-3 py-2 text-xs font-medium ${THEME_CLASSES.inkMuted} hover:text-[var(--ink-primary)] cursor-pointer whitespace-nowrap shrink-0`}
                     >
                       <Bookmark
                         className={`h-4 w-4 ${
                           bookmarks.includes(leadDiscourse.id)
-                            ? 'fill-[#9A3412] text-[#9A3412] dark:fill-[#FDBA74] dark:text-[#FDBA74]'
+                            ? 'fill-[var(--accent-ink)] text-[var(--accent-ink)]'
                             : ''
                         }`}
                         aria-hidden="true"
@@ -605,7 +704,7 @@ export function DiscourseCatalog({
                     <button
                       type="button"
                       onClick={() => onExportMarkdown(leadDiscourse)}
-                      className="inline-flex items-center gap-1.5 min-h-[40px] px-3 py-2 text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer whitespace-nowrap shrink-0"
+                      className={`inline-flex items-center gap-1.5 min-h-[40px] px-3 py-2 text-xs font-medium ${THEME_CLASSES.inkMuted} hover:text-[var(--ink-primary)] cursor-pointer whitespace-nowrap shrink-0`}
                     >
                       <Download className="h-4 w-4" aria-hidden="true" />
                       <span>Export .md</span>
@@ -615,7 +714,9 @@ export function DiscourseCatalog({
               </article>
 
               {secondaryDiscourses.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-[#E5DFD3] dark:border-[#342E28]">
+                <div
+                  className={`grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t ${THEME_CLASSES.borderHairline}`}
+                >
                   {secondaryDiscourses.map((d) => (
                     <article key={d.id} className="flex flex-col justify-between gap-5">
                       <div className="space-y-4">
@@ -626,8 +727,10 @@ export function DiscourseCatalog({
                         />
 
                         <div className="space-y-2.5">
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-[#78716C] dark:text-[#A8A29E]">
-                            <span className="font-mono-code text-[#9A3412] dark:text-[#FDBA74]">
+                          <div
+                            className={`flex flex-wrap items-center gap-2 text-xs ${THEME_CLASSES.inkSubtle}`}
+                          >
+                            <span className={`font-mono-code ${THEME_CLASSES.accentInk}`}>
                               {d.accessionCode}
                             </span>
                             <span aria-hidden="true">·</span>
@@ -639,35 +742,37 @@ export function DiscourseCatalog({
                             </span>
                           </div>
 
-                          <h3 className="font-display text-2xl font-semibold leading-snug text-[#1C1917] dark:text-[#F5F5F4] text-balance">
+                          <h3
+                            className={`font-display text-2xl font-semibold leading-snug ${THEME_CLASSES.inkPrimary} text-balance`}
+                          >
                             <button
                               type="button"
                               onClick={() => onSelectDiscourse(d.id)}
-                              className="text-left hover:text-[#9A3412] dark:hover:text-[#FDBA74] transition-colors cursor-pointer"
+                              className="text-left hover:text-[var(--accent-ink)] transition-colors cursor-pointer"
                             >
                               {d.title}
                             </button>
                           </h3>
 
                           {d.chineseTitle && (
-                            <p className="text-sm text-[#57534E] dark:text-[#D6D3D1]">
-                              {d.chineseTitle}
-                            </p>
+                            <p className={`text-sm ${THEME_CLASSES.inkMuted}`}>{d.chineseTitle}</p>
                           )}
 
-                          <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                          <p className={`text-xs ${THEME_CLASSES.inkMuted}`}>
                             <button
                               type="button"
                               onClick={() => onSayadawChange(d.sayadawId)}
-                              className="font-medium text-[#292524] dark:text-[#E7E5E4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer"
+                              className={`font-medium ${THEME_CLASSES.inkBody} hover:text-[var(--accent-ink)] hover:underline underline-offset-4 cursor-pointer`}
                             >
                               {d.sayadawName}
                             </button>
-                            <span className="mx-1.5" aria-hidden="true">·</span>
+                            <span className="mx-1.5" aria-hidden="true">
+                              ·
+                            </span>
                             <span>{d.sourceText}</span>
                           </p>
 
-                          <p className="text-sm leading-relaxed text-[#44403C] dark:text-[#D6D3D1]">
+                          <p className={`text-sm leading-relaxed ${THEME_CLASSES.inkSecondary}`}>
                             {d.summary}
                           </p>
                         </div>
@@ -677,21 +782,21 @@ export function DiscourseCatalog({
                         <button
                           type="button"
                           onClick={() => onSelectDiscourse(d.id)}
-                          className="text-sm font-medium text-[#9A3412] dark:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer"
+                          className={`text-sm font-medium ${THEME_CLASSES.accentInk} hover:underline underline-offset-4 cursor-pointer`}
                         >
                           Read Discourse
                         </button>
                         <button
                           type="button"
                           onClick={() => onToggleBookmark(d.id)}
-                          className="text-xs text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
+                          className={`text-xs ${THEME_CLASSES.inkMuted} hover:text-[var(--ink-primary)] cursor-pointer`}
                         >
                           {bookmarks.includes(d.id) ? 'Saved' : 'Save'}
                         </button>
                         <button
                           type="button"
                           onClick={() => onExportMarkdown(d)}
-                          className="text-xs text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
+                          className={`text-xs ${THEME_CLASSES.inkMuted} hover:text-[var(--ink-primary)] cursor-pointer`}
                         >
                           Export .md
                         </button>
@@ -705,12 +810,13 @@ export function DiscourseCatalog({
 
           {/* Tier 3: Complete Archive Catalogue */}
           <div className="pt-10">
-            <div className="flex flex-wrap items-baseline justify-between gap-3 pb-4 border-b border-[#1C1917]/20 dark:border-[#E7E5E4]/20">
-              <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+            <div className="flex flex-wrap items-baseline justify-between gap-3 pb-4 border-b border-[var(--ink-primary)]/20">
+              <h3 className={`font-display text-2xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
                 {groupBySayadaw ? 'Catalogue Indexed by Sayadaw' : 'Complete Archival Catalogue'}
               </h3>
-              <span className="font-mono-code text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums">
-                {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'} · {totalStudyMinutes} min total study
+              <span className={`font-mono-code text-xs ${THEME_CLASSES.inkSubtle} tabular-nums`}>
+                {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'} · {totalStudyMinutes}{' '}
+                min total study
               </span>
             </div>
 
@@ -718,24 +824,29 @@ export function DiscourseCatalog({
               <div className="space-y-10 pt-6">
                 {groupedBySayadaw.map((group) => (
                   <div key={group.sayadawId} className="space-y-2">
-                    <div className="flex flex-wrap items-baseline justify-between gap-3 pb-2.5 border-b border-[#D6CEBE] dark:border-[#342E28]">
+                    <div
+                      className={`flex flex-wrap items-baseline justify-between gap-3 pb-2.5 border-b ${THEME_CLASSES.borderStrong}`}
+                    >
                       <div className="flex items-baseline gap-3">
                         <button
                           type="button"
                           onClick={() => onSayadawChange(group.sayadawId)}
-                          className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] transition-colors cursor-pointer"
+                          className={`font-display text-2xl font-semibold ${THEME_CLASSES.inkPrimary} hover:text-[var(--accent-ink)] transition-colors cursor-pointer`}
                         >
                           {group.sayadawName}
                         </button>
-                        <span className="font-mono-code text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums">
-                          {group.items.length} {group.items.length === 1 ? 'discourse' : 'discourses'}
+                        <span
+                          className={`font-mono-code text-xs ${THEME_CLASSES.inkSubtle} tabular-nums`}
+                        >
+                          {group.items.length}{' '}
+                          {group.items.length === 1 ? 'discourse' : 'discourses'}
                         </span>
                       </div>
                       {isOwner && (
                         <button
                           type="button"
                           onClick={() => onOpenStoreModal(group.sayadawId)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-[#9A3412] dark:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer"
+                          className={`inline-flex items-center gap-1 text-xs font-medium ${THEME_CLASSES.accentInk} hover:underline underline-offset-4 cursor-pointer`}
                         >
                           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                           <span>Add under this Sayadaw</span>
@@ -743,195 +854,59 @@ export function DiscourseCatalog({
                       )}
                     </div>
 
-                    <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28]">
-                      {group.items.map((d) => {
-                        const isSaved = bookmarks.includes(d.id);
-                        const estMinutes = readingTimesById.get(d.id) ?? d.readingMinutes;
-                        const hasMedia = Boolean(
-                          d.audioReferenceUrl || (d.mediaItems && d.mediaItems.length > 0),
-                        );
-                        return (
-                          <div
-                            key={d.id}
-                            className="py-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start lg:items-center hover:bg-[#F4EFE6]/50 dark:hover:bg-[#221E1A]/60 transition-colors px-2 -mx-2"
-                          >
-                            <div className="lg:col-span-2 flex items-center gap-2">
-                              <span className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74] tabular-nums">
-                                {d.accessionCode}
-                              </span>
-                            </div>
-
-                            <div className="lg:col-span-5 space-y-1">
-                              <button
-                                type="button"
-                                onClick={() => onSelectDiscourse(d.id)}
-                                className="text-left font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] transition-colors cursor-pointer"
-                              >
-                                {d.title}
-                              </button>
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-[#57534E] dark:text-[#A8A29E]">
-                                {d.chineseTitle && <span>{d.chineseTitle}</span>}
-                                {d.chineseTitle && <span aria-hidden="true">·</span>}
-                                <span>{d.sourceText}</span>
-                              </div>
-                            </div>
-
-                            <div className="lg:col-span-2 text-xs text-[#57534E] dark:text-[#A8A29E] space-y-0.5">
-                              <p>{d.collection}</p>
-                              <p className="inline-flex items-center gap-2 tabular-nums text-[#9A3412] dark:text-[#FDBA74]">
-                                <span className="inline-flex items-center gap-1">
-                                  <Clock className="h-3 w-3" aria-hidden="true" />
-                                  <span>{estMinutes} min</span>
-                                </span>
-                                {hasMedia && (
-                                  <span className="inline-flex items-center gap-1 text-[#57534E] dark:text-[#A8A29E]">
-                                    <Headphones className="h-3 w-3" aria-hidden="true" />
-                                    <span>Media</span>
-                                  </span>
-                                )}
-                              </p>
-                            </div>
-
-                            <div className="lg:col-span-3 flex items-center lg:justify-end gap-1.5">
-                              {renderOwnerActions(d)}
-                              <button
-                                type="button"
-                                onClick={() => onToggleBookmark(d.id)}
-                                aria-label={
-                                  isSaved ? `Remove ${d.title} from shelf` : `Save ${d.title} to shelf`
-                                }
-                                className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
-                              >
-                                <Bookmark
-                                  className={`h-4 w-4 ${
-                                    isSaved
-                                      ? 'fill-[#9A3412] text-[#9A3412] dark:fill-[#FDBA74] dark:text-[#FDBA74]'
-                                      : ''
-                                  }`}
-                                />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => onExportMarkdown(d)}
-                                aria-label={`Export ${d.title} as Markdown`}
-                                className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
-                              >
-                                <Download className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => onSelectDiscourse(d.id)}
-                                className="min-h-[40px] px-3.5 py-1.5 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] hover:text-[#9A3412] dark:hover:border-[#FDBA74] dark:hover:text-[#FDBA74] transition-colors cursor-pointer whitespace-nowrap shrink-0"
-                              >
-                                Read
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className={THEME_CLASSES.divideHairline}>
+                      {group.items.map((d) => (
+                        <CatalogueRow
+                          key={d.id}
+                          discourse={d}
+                          sayadaws={sayadaws}
+                          estMinutes={readingTimesById.get(d.id) ?? d.readingMinutes}
+                          isSaved={bookmarks.includes(d.id)}
+                          isOwner={isOwner}
+                          isConfirmingDelete={confirmDeleteId === d.id}
+                          showSayadawColumn={false}
+                          onSelectDiscourse={onSelectDiscourse}
+                          onSayadawChange={onSayadawChange}
+                          onToggleBookmark={onToggleBookmark}
+                          onExportMarkdown={onExportMarkdown}
+                          onEditDiscourse={onEditDiscourse}
+                          onRequestDelete={setConfirmDeleteId}
+                          onConfirmDelete={(id) => {
+                            onDeleteDiscourse(id);
+                            setConfirmDeleteId(null);
+                          }}
+                          onCancelDelete={() => setConfirmDeleteId(null)}
+                        />
+                      ))}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="divide-y divide-[#E5DFD3] dark:divide-[#342E28]">
-                {filtered.map((d) => {
-                  const isSaved = bookmarks.includes(d.id);
-                  const estMinutes = readingTimesById.get(d.id) ?? d.readingMinutes;
-                  const hasMedia = Boolean(
-                    d.audioReferenceUrl || (d.mediaItems && d.mediaItems.length > 0),
-                  );
-                  return (
-                    <div
-                      key={d.id}
-                      className="py-5 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start lg:items-center hover:bg-[#F4EFE6]/50 dark:hover:bg-[#221E1A]/60 transition-colors px-2 -mx-2"
-                    >
-                      <div className="lg:col-span-2 flex items-center gap-3">
-                        <span className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74] tabular-nums">
-                          {d.accessionCode}
-                        </span>
-                      </div>
-
-                      <div className="lg:col-span-4 space-y-1">
-                        <button
-                          type="button"
-                          onClick={() => onSelectDiscourse(d.id)}
-                          className="text-left font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] transition-colors cursor-pointer"
-                        >
-                          {d.title}
-                        </button>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-[#57534E] dark:text-[#A8A29E]">
-                          {d.chineseTitle && <span>{d.chineseTitle}</span>}
-                          {d.chineseTitle && <span aria-hidden="true">·</span>}
-                          <span>{d.sourceText}</span>
-                        </div>
-                        <p className="font-mono-code text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
-                          {buildDiscoursePath(d, sayadaws)}
-                        </p>
-                      </div>
-
-                      <div className="lg:col-span-3 text-xs text-[#57534E] dark:text-[#A8A29E] space-y-0.5">
-                        <p>
-                          <button
-                            type="button"
-                            onClick={() => onSayadawChange(d.sayadawId)}
-                            className="font-medium text-[#292524] dark:text-[#E7E5E4] hover:text-[#9A3412] dark:hover:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer text-left"
-                          >
-                            {d.sayadawName}
-                          </button>
-                        </p>
-                        <p className="inline-flex flex-wrap items-center gap-1.5">
-                          <span>{d.collection}</span>
-                          <span aria-hidden="true">·</span>
-                          <span className="inline-flex items-center gap-1 tabular-nums text-[#9A3412] dark:text-[#FDBA74]">
-                            <Clock className="h-3 w-3" aria-hidden="true" />
-                            <span>{estMinutes} min read</span>
-                          </span>
-                          {hasMedia && (
-                            <>
-                              <span aria-hidden="true">·</span>
-                              <span className="inline-flex items-center gap-1 text-[#57534E] dark:text-[#A8A29E]">
-                                <Headphones className="h-3 w-3" aria-hidden="true" />
-                                <span>Media</span>
-                              </span>
-                            </>
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="lg:col-span-3 flex items-center lg:justify-end gap-1.5">
-                        {renderOwnerActions(d)}
-                        <button
-                          type="button"
-                          onClick={() => onToggleBookmark(d.id)}
-                          aria-label={isSaved ? `Remove ${d.title} from shelf` : `Save ${d.title} to shelf`}
-                          className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer"
-                        >
-                          <Bookmark
-                            className={`h-4 w-4 ${
-                              isSaved ? 'fill-[#9A3412] text-[#9A3412] dark:fill-[#FDBA74] dark:text-[#FDBA74]' : ''
-                            }`}
-                          />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onExportMarkdown(d)}
-                          aria-label={`Export ${d.title} as Markdown`}
-                          className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
-                        >
-                          <Download className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onSelectDiscourse(d.id)}
-                          className="min-h-[40px] px-3.5 py-1.5 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] hover:text-[#9A3412] dark:hover:border-[#FDBA74] dark:hover:text-[#FDBA74] transition-colors cursor-pointer whitespace-nowrap shrink-0"
-                        >
-                          Read
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className={THEME_CLASSES.divideHairline}>
+                {filtered.map((d) => (
+                  <CatalogueRow
+                    key={d.id}
+                    discourse={d}
+                    sayadaws={sayadaws}
+                    estMinutes={readingTimesById.get(d.id) ?? d.readingMinutes}
+                    isSaved={bookmarks.includes(d.id)}
+                    isOwner={isOwner}
+                    isConfirmingDelete={confirmDeleteId === d.id}
+                    showSayadawColumn
+                    onSelectDiscourse={onSelectDiscourse}
+                    onSayadawChange={onSayadawChange}
+                    onToggleBookmark={onToggleBookmark}
+                    onExportMarkdown={onExportMarkdown}
+                    onEditDiscourse={onEditDiscourse}
+                    onRequestDelete={setConfirmDeleteId}
+                    onConfirmDelete={(id) => {
+                      onDeleteDiscourse(id);
+                      setConfirmDeleteId(null);
+                    }}
+                    onCancelDelete={() => setConfirmDeleteId(null)}
+                  />
+                ))}
               </div>
             )}
           </div>

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { ExternalLink } from 'lucide-react';
+import { GITHUB_CONFIG, NAV_ITEMS, SITE_CONFIG } from '../config/siteConfig';
+import { THEME_CLASSES } from '../theme/uiClasses';
 import { NavSection } from '../types/dhamma';
 
 interface FooterProps {
@@ -13,82 +15,58 @@ export function Footer({ isOwner, ownerLogin, onNavigate, onResetArchive }: Foot
   const [confirmReset, setConfirmReset] = useState(false);
 
   return (
-    <footer className="border-t border-[#E5DFD3] dark:border-[#342E28] bg-[#F4EFE6]/50 dark:bg-[#161310]">
+    <footer className={`border-t ${THEME_CLASSES.borderHairline} bg-[var(--surface-footer)]`}>
       <div className="mx-auto max-w-[1200px] px-4 py-12 sm:px-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
         <div className="space-y-2 max-w-xl">
-          <p className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
-            Vipassana Bhavana · Dhamma Page
+          <p className={`font-display text-xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
+            {SITE_CONFIG.brandTitle} · {SITE_CONFIG.pageTitleSuffix}
           </p>
-          <p className="text-xs leading-relaxed text-[#57534E] dark:text-[#A8A29E]">
+          <p className={`text-xs leading-relaxed ${THEME_CLASSES.inkMuted}`}>
             Dhamma-dāna Open Repository hosted via GitHub Pages at{' '}
-            <span className="font-mono-code">theartofnoting.github.io/dhamma_content</span> from{' '}
-            <span className="font-mono-code">github.com/theartofnoting/dhamma_content</span>. Offered
-            freely under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 for
-            non-commercial practice and study.
+            <span className="font-mono-code">{GITHUB_CONFIG.pagesHost}</span> from{' '}
+            <span className="font-mono-code">github.com/{GITHUB_CONFIG.repoSlug}</span>.{' '}
+            {SITE_CONFIG.licenseFooter}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-5 text-xs text-[#57534E] dark:text-[#A8A29E]">
-          <button
-            type="button"
-            onClick={() => onNavigate('discourses')}
-            className="hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
-          >
-            Discourses
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('sayadaws')}
-            className="hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
-          >
-            Sayadaws
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('tips')}
-            className="hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
-          >
-            Meditation Tips
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('events')}
-            className="hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
-          >
-            Events
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('forms')}
-            className="hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
-          >
-            Forms
-          </button>
+        <div className={`flex flex-wrap items-center gap-5 text-xs ${THEME_CLASSES.inkMuted}`}>
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onNavigate(item.id)}
+              className="hover:text-[var(--ink-primary)] cursor-pointer"
+            >
+              {item.label}
+            </button>
+          ))}
+
           {isOwner && (
             <button
               type="button"
               onClick={() => onNavigate('github')}
-              className="hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
+              className="hover:text-[var(--ink-primary)] cursor-pointer"
             >
               GitHub Pages
             </button>
           )}
+
           <a
-            href="https://github.com/theartofnoting/dhamma_content"
+            href={GITHUB_CONFIG.repoUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 hover:text-[#9A3412] dark:hover:text-[#FDBA74]"
+            className="inline-flex items-center gap-1 hover:text-[var(--accent-ink)]"
           >
-            <span>theartofnoting/dhamma_content</span>
+            <span>{GITHUB_CONFIG.repoSlug}</span>
             <ExternalLink className="h-3 w-3" aria-hidden="true" />
           </a>
 
           <button
             type="button"
             onClick={() => onNavigate('login')}
-            className="hover:text-[#9A3412] dark:hover:text-[#FDBA74] cursor-pointer font-medium"
+            className="hover:text-[var(--accent-ink)] cursor-pointer font-medium"
           >
-            {isOwner ? `Owner: @${ownerLogin || 'theartofnoting'}` : 'Owner Login'}
+            {isOwner ? `Owner: @${ownerLogin || GITHUB_CONFIG.owner}` : 'Owner Login'}
           </button>
 
           {isOwner && (
@@ -97,7 +75,7 @@ export function Footer({ isOwner, ownerLogin, onNavigate, onResetArchive }: Foot
                 <button
                   type="button"
                   onClick={() => setConfirmReset(true)}
-                  className="hover:text-[#9A3412] dark:hover:text-[#FCA5A5] cursor-pointer"
+                  className="hover:text-[var(--status-danger)] cursor-pointer"
                 >
                   Restore Defaults
                 </button>
@@ -109,14 +87,14 @@ export function Footer({ isOwner, ownerLogin, onNavigate, onResetArchive }: Foot
                       onResetArchive();
                       setConfirmReset(false);
                     }}
-                    className="text-[#9A3412] dark:text-[#FCA5A5] font-medium underline cursor-pointer"
+                    className={`${THEME_CLASSES.dangerInk} font-medium underline cursor-pointer`}
                   >
                     Confirm Reset
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirmReset(false)}
-                    className="hover:text-[#1C1917] cursor-pointer"
+                    className="hover:text-[var(--ink-primary)] cursor-pointer"
                   >
                     Cancel
                   </button>

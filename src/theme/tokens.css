@@ -1,0 +1,55 @@
+:root {
+  --font-display: "Cormorant Garamond", "Noto Serif TC", Georgia, serif;
+  --font-body: "Source Serif 4", "Noto Serif TC", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --surface-canvas: #FBF9F5;
+  --surface-muted: #F4EFE6;
+  --surface-elevated: #EFEAE0;
+  --surface-footer: rgba(244, 239, 230, 0.5);
+  --surface-band: rgba(244, 239, 230, 0.45);
+  --surface-input: rgba(244, 239, 230, 0.6);
+
+  --ink-primary: #1C1917;
+  --ink-body: #292524;
+  --ink-secondary: #44403C;
+  --ink-muted: #57534E;
+  --ink-subtle: #78716C;
+
+  --border-hairline: #E5DFD3;
+  --border-strong: #D6CEBE;
+
+  --accent-primary: #9A3412;
+  --accent-hover: #7C2D12;
+  --accent-ink: #9A3412;
+  --accent-contrast: #FBF9F5;
+
+  --status-success: #14532D;
+  --status-danger: #9A3412;
+}
+
+.dark {
+  --surface-canvas: #181512;
+  --surface-muted: #1E1A16;
+  --surface-elevated: #221E1A;
+  --surface-footer: #161310;
+  --surface-band: #1E1A16;
+  --surface-input: #221E1A;
+
+  --ink-primary: #F5F5F4;
+  --ink-body: #E7E5E4;
+  --ink-secondary: #D6D3D1;
+  --ink-muted: #A8A29E;
+  --ink-subtle: #A8A29E;
+
+  --border-hairline: #342E28;
+  --border-strong: #44403C;
+
+  --accent-primary: #B45309;
+  --accent-hover: #92400E;
+  --accent-ink: #FDBA74;
+  --accent-contrast: #FBF9F5;
+
+  --status-success: #86EFAC;
+  --status-danger: #FCA5A5;
+}

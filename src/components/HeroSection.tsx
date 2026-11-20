@@ -1,5 +1,6 @@
 import { ArrowRight } from 'lucide-react';
-import { HERO_LIBRARY_IMAGE } from '../data/dhammaSeed';
+import { GITHUB_CONFIG, SITE_CONFIG } from '../config/siteConfig';
+import { THEME_CLASSES } from '../theme/uiClasses';
 import { ArchivalImage } from './ArchivalImage';
 
 interface HeroSectionProps {
@@ -22,23 +23,23 @@ export function HeroSection({
   onOpenGitHubStudio,
 }: HeroSectionProps) {
   return (
-    <section className="border-b border-[#E5DFD3] dark:border-[#342E28]">
+    <section className={`border-b ${THEME_CLASSES.borderHairline}`}>
       <div className="mx-auto max-w-[1200px] px-4 pt-10 pb-10 sm:px-8 sm:pt-14 sm:pb-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-stretch">
           <div className="lg:col-span-6 flex flex-col justify-between gap-8">
             <div className="space-y-5">
-              <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E] font-mono-code">
-                Dhamma Page
+              <p className={`text-xs tracking-widest uppercase ${THEME_CLASSES.inkSubtle} font-mono-code`}>
+                {SITE_CONFIG.heroKicker}
               </p>
 
-              <h1 className="font-display text-4xl sm:text-5xl lg:text-[3.35rem] font-semibold leading-[1.12] tracking-tight text-[#1C1917] dark:text-[#F5F5F4] text-balance">
-                Sayadaw Teachings, Meditation Practice &amp; Group Courses
+              <h1
+                className={`font-display text-4xl sm:text-5xl lg:text-[3.35rem] font-semibold leading-[1.12] tracking-tight ${THEME_CLASSES.inkPrimary} text-balance`}
+              >
+                {SITE_CONFIG.heroHeadline}
               </h1>
 
-              <p className="text-base sm:text-[1.0625rem] leading-[1.7] text-[#44403C] dark:text-[#D6D3D1] max-w-xl">
-                The living Dhamma repository for our Vipassana Bhavana group. Store and read
-                discourses from our Sayadaw teachers, explore practical meditation tips, follow
-                upcoming retreat courses, and submit registrations online.
+              <p className={`text-base sm:text-[1.0625rem] leading-[1.7] ${THEME_CLASSES.inkSecondary} max-w-xl`}>
+                {SITE_CONFIG.heroDescription}
               </p>
             </div>
 
@@ -46,7 +47,7 @@ export function HeroSection({
               <button
                 type="button"
                 onClick={onEnterReadingRoom}
-                className="inline-flex items-center gap-2.5 min-h-[44px] px-6 py-2.5 text-sm font-medium text-[#FBF9F5] bg-[#1C1917] hover:bg-[#292524] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#E7E5E4] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9A3412]"
+                className="inline-flex items-center gap-2.5 min-h-[44px] px-6 py-2.5 text-sm font-medium bg-[var(--ink-primary)] text-[var(--surface-canvas)] hover:opacity-90 transition-opacity duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
               >
                 <span>{totalDiscourses > 0 ? 'Open Reading Room' : 'Browse Archive'}</span>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -55,7 +56,7 @@ export function HeroSection({
               <button
                 type="button"
                 onClick={onExploreEvents}
-                className="inline-flex items-center min-h-[44px] px-5 py-2.5 text-sm font-medium text-[#1C1917] dark:text-[#E7E5E4] border border-[#D6CEBE] dark:border-[#44403C] hover:border-[#9A3412] dark:hover:border-[#D97757] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9A3412]"
+                className={`inline-flex items-center min-h-[44px] px-5 py-2.5 text-sm font-medium ${THEME_CLASSES.inkPrimary} border ${THEME_CLASSES.borderStrong} hover:border-[var(--accent-ink)] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]`}
               >
                 Upcoming Courses &amp; Events
               </button>
@@ -64,43 +65,42 @@ export function HeroSection({
 
           <div className="lg:col-span-6 flex flex-col">
             <ArchivalImage
-              src={HERO_LIBRARY_IMAGE}
-              alt="Monastic library desk with palm-leaf manuscripts and bound Pāli volumes in warm morning light"
-              caption="Fig. 1 — Palm-leaf manuscripts and bound Tipiṭaka study volumes in morning light."
+              src={SITE_CONFIG.heroImage}
+              alt={SITE_CONFIG.heroImageAlt}
+              caption={SITE_CONFIG.heroImageCaption}
               aspectClassName="aspect-[16/10] lg:aspect-auto lg:h-full min-h-[260px]"
               className="h-full"
             />
           </div>
         </div>
 
-        {/* Full-width 4-column summary strip */}
-        <div className="mt-10 pt-8 border-t border-[#E5DFD3] dark:border-[#342E28] grid grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className={`mt-10 pt-8 border-t ${THEME_CLASSES.borderHairline} grid grid-cols-2 lg:grid-cols-4 gap-6`}>
           <div>
-            <dt className="text-xs tracking-wider uppercase text-[#78716C] dark:text-[#A8A29E]">
+            <dt className={`text-xs tracking-wider uppercase ${THEME_CLASSES.inkSubtle}`}>
               Sayadaw Discourses
             </dt>
-            <dd className="mt-1 font-display text-3xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] tabular-nums">
+            <dd className={`mt-1 font-display text-3xl font-semibold ${THEME_CLASSES.inkPrimary} tabular-nums`}>
               {totalDiscourses}
             </dd>
           </div>
           <div>
-            <dt className="text-xs tracking-wider uppercase text-[#78716C] dark:text-[#A8A29E]">
+            <dt className={`text-xs tracking-wider uppercase ${THEME_CLASSES.inkSubtle}`}>
               Meditation Tips
             </dt>
-            <dd className="mt-1 font-display text-3xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] tabular-nums">
+            <dd className={`mt-1 font-display text-3xl font-semibold ${THEME_CLASSES.inkPrimary} tabular-nums`}>
               {totalTips}
             </dd>
           </div>
           <div>
-            <dt className="text-xs tracking-wider uppercase text-[#78716C] dark:text-[#A8A29E]">
+            <dt className={`text-xs tracking-wider uppercase ${THEME_CLASSES.inkSubtle}`}>
               Scheduled Courses
             </dt>
-            <dd className="mt-1 font-display text-3xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] tabular-nums">
+            <dd className={`mt-1 font-display text-3xl font-semibold ${THEME_CLASSES.inkPrimary} tabular-nums`}>
               {totalEvents}
             </dd>
           </div>
           <div>
-            <dt className="text-xs tracking-wider uppercase text-[#78716C] dark:text-[#A8A29E]">
+            <dt className={`text-xs tracking-wider uppercase ${THEME_CLASSES.inkSubtle}`}>
               {isOwner ? 'Archive Publishing' : 'Open Dhamma Archive'}
             </dt>
             <dd className="mt-1.5">
@@ -108,18 +108,18 @@ export function HeroSection({
                 <button
                   type="button"
                   onClick={onOpenGitHubStudio}
-                  className="font-mono-code text-sm text-[#9A3412] dark:text-[#FDBA74] hover:underline underline-offset-4 cursor-pointer text-left break-all"
+                  className={`font-mono-code text-sm ${THEME_CLASSES.accentInk} hover:underline underline-offset-4 cursor-pointer text-left break-all`}
                 >
-                  theartofnoting.github.io/dhamma_content
+                  {GITHUB_CONFIG.pagesHost}
                 </button>
               ) : (
                 <a
-                  href="https://github.com/theartofnoting/dhamma_content"
+                  href={GITHUB_CONFIG.repoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono-code text-sm text-[#9A3412] dark:text-[#FDBA74] hover:underline underline-offset-4 text-left break-all"
+                  className={`font-mono-code text-sm ${THEME_CLASSES.accentInk} hover:underline underline-offset-4 text-left break-all`}
                 >
-                  theartofnoting.github.io/dhamma_content
+                  {GITHUB_CONFIG.pagesHost}
                 </a>
               )}
             </dd>

@@ -1,3 +1,11 @@
+import { TAXONOMY } from '../config/siteConfig';
+import { calculateEstimatedReadingMinutes } from '../tools/readingTime';
+import {
+  getCollectionSlug,
+  getDiscourseSlug,
+  getSayadawSlug,
+  slugifySegment,
+} from '../tools/slugify';
 import {
   DhammaDiscourse,
   DiscourseLanguage,
@@ -6,8 +14,6 @@ import {
   SayadawProfile,
   TraditionCollection,
 } from '../types/dhamma';
-import { calculateEstimatedReadingMinutes } from './storageAndExport';
-import { getCollectionSlug, getDiscourseSlug, getSayadawSlug, slugifySegment } from './urlRouter';
 
 const rawArticleModules = import.meta.glob('/content/articles/**/*.{md,rst}', {
   query: '?raw',
@@ -15,18 +21,10 @@ const rawArticleModules = import.meta.glob('/content/articles/**/*.{md,rst}', {
   eager: true,
 }) as Record<string, string>;
 
-const KNOWN_COLLECTIONS: TraditionCollection[] = [
-  'Abhidhamma',
-  'Satipatthana & Vipassana',
-  'Sutta Pitaka',
-  'Visuddhimagga',
-  'Monastic Talks',
-];
-
 function resolveCollection(raw?: string): TraditionCollection {
   if (!raw) return 'Satipatthana & Vipassana';
   const lower = raw.toLowerCase();
-  const exact = KNOWN_COLLECTIONS.find((c) => c.toLowerCase() === lower);
+  const exact = TAXONOMY.collections.find((c) => c.toLowerCase() === lower);
   if (exact) return exact;
   if (lower.includes('abhidhamma') || lower.includes('patthana')) return 'Abhidhamma';
   if (lower.includes('sutta') || lower.includes('nikaya')) return 'Sutta Pitaka';
@@ -49,7 +47,6 @@ function inferPathSegments(filePath: string): {
   fileSlug: string;
   format: 'md' | 'rst';
 } {
-  // Expected: /content/articles/<collectionSlug>/<sayadawSlug>/<fileSlug>.(md|rst)
   const clean = filePath.replace(/^\/+/, '');
   const parts = clean.split('/').filter(Boolean);
   const filename = parts[parts.length - 1] || 'discourse.md';
@@ -187,7 +184,7 @@ function parseMarkdownArticle(
     language: resolveLanguage(meta.language),
     dateRecorded: meta.date || meta.date_recorded || 'Archive Article',
     readingMinutes: 5,
-    sourceText: meta.source || meta.source_text || 'Vipassana Bhavana Article Collection',
+    sourceText: meta.source || meta.source_text || 'Archive Article',
     summary: meta.summary || sections[0]?.paragraphs[0]?.slice(0, 220) || title,
     sections,
     pullQuote:
@@ -195,14 +192,7 @@ function parseMarkdownArticle(
       sections[0]?.paragraphs[0]?.slice(0, 160) ||
       'Observe phenomena as they arise and pass away.',
     marginNotes: [],
-    footnotes: meta.source
-      ? [
-          {
-            index: 1,
-            text: meta.source,
-          },
-        ]
-      : [],
+    footnotes: meta.source ? [{ index: 1, text: meta.source }] : [],
     coverImage: meta.cover_image || undefined,
     audioReferenceUrl: meta.audio || meta.audio_reference || undefined,
     repoPath: filePath.replace(/^\/+/, ''),
@@ -231,7 +221,6 @@ function parseRstArticle(
     const trimmed = line.trim();
     const nextTrimmed = (lines[i + 1] || '').trim();
 
-    // Overline + title + underline (=== / ***)
     if (
       /^[=\-*~^]{4,}$/.test(trimmed) &&
       i + 2 < lines.length &&
@@ -245,7 +234,6 @@ function parseRstArticle(
       }
     }
 
-    // Document title or section heading with underline (===, ---, ~~~)
     if (trimmed && /^[=\-~^]{4,}$/.test(nextTrimmed)) {
       if (!title && (nextTrimmed.startsWith('=') || nextTrimmed.startsWith('*'))) {
         title = trimmed;
@@ -257,14 +245,12 @@ function parseRstArticle(
       continue;
     }
 
-    // Sphinx field metadata :key: value
     const fieldMatch = trimmed.match(/^:([a-zA-Z0-9_]+):\s*(.+)$/);
     if (fieldMatch) {
       meta[fieldMatch[1].toLowerCase()] = fieldMatch[2].trim();
       continue;
     }
 
-    // RST directives: .. image:: / .. figure:: / .. audio:: / .. video::
     const dirMatch = trimmed.match(/^\.\.\s+(image|figure|audio|video)::\s*(.+)$/i);
     if (dirMatch) {
       const dirType = dirMatch[1].toLowerCase();
@@ -291,13 +277,11 @@ function parseRstArticle(
       continue;
     }
 
-    // Skip RST comment/toctree lines
     if (trimmed.startsWith('.. ')) continue;
 
     bodyLines.push(line);
   }
 
-  // Group into sections & paragraphs (preserving blank-line separation)
   const sections: DiscourseSection[] = [];
   let currentHeading = '1. Discourse Text';
   let currentParagraphs: string[] = [];
@@ -366,14 +350,7 @@ function parseRstArticle(
       sections[0]?.paragraphs[0]?.slice(0, 160) ||
       'Contemplate arising and passing away in the present moment.',
     marginNotes: [],
-    footnotes: meta.source
-      ? [
-          {
-            index: 1,
-            text: meta.source,
-          },
-        ]
-      : [],
+    footnotes: meta.source ? [{ index: 1, text: meta.source }] : [],
     coverImage: meta.cover_image || undefined,
     audioReferenceUrl: meta.audio || undefined,
     mediaItems: mediaItems.length > 0 ? mediaItems : undefined,

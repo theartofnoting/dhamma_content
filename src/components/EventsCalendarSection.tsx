@@ -1,17 +1,13 @@
 import { useMemo, useState } from 'react';
-import {
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  List,
-  Pencil,
-  Plus,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Download, List, Pencil, Plus } from 'lucide-react';
+import { SITE_CONFIG, TAXONOMY } from '../config/siteConfig';
+import { eventToIcs } from '../content/exporters';
+import { ConfirmDeleteAction } from '../theme/components/ConfirmDeleteAction';
+import { EditorModal } from '../theme/components/EditorModal';
+import { SectionHeader } from '../theme/components/SectionHeader';
+import { THEME_CLASSES } from '../theme/uiClasses';
+import { triggerFileDownload } from '../tools/fileTools';
 import { EventStatus, EventType, GoogleFormTab, GroupEvent } from '../types/dhamma';
-import { eventToIcs, triggerFileDownload } from '../utils/storageAndExport';
 
 interface EventsCalendarSectionProps {
   events: GroupEvent[];
@@ -22,41 +18,10 @@ interface EventsCalendarSectionProps {
   onRegisterWithForm: (formTabId: string) => void;
 }
 
-const EVENT_TYPES: (EventType | 'All')[] = [
-  'All',
-  'Retreat Course',
-  'Group Sitting',
-  'Dhamma Talk',
-  'Study Circle',
-];
-
-const EVENT_STATUSES: EventStatus[] = [
-  'Registration Open',
-  'Drop-In Welcome',
-  'Waitlist',
-  'Completed',
-];
-
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const EVENT_FILTER_TYPES: (EventType | 'All')[] = ['All', ...TAXONOMY.eventTypes];
 
 function formatDateRange(start: string, end: string): string {
-  if (start === end) return start;
-  return `${start} – ${end}`;
+  return start === end ? start : `${start} – ${end}`;
 }
 
 export function EventsCalendarSection({
@@ -71,22 +36,21 @@ export function EventsCalendarSection({
   const [selectedType, setSelectedType] = useState<EventType | 'All'>('All');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Calendar Month State (defaults to current system month, Nov 2026)
-  const [calYear, setCalYear] = useState(2026);
-  const [calMonth, setCalMonth] = useState(10); // 0-indexed: 10 = November
+  const now = useMemo(() => new Date(), []);
+  const [calYear, setCalYear] = useState(now.getFullYear());
+  const [calMonth, setCalMonth] = useState(now.getMonth());
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<GroupEvent | null>(null);
   const [title, setTitle] = useState('');
-  const [eventType, setEventType] = useState<EventType>('Retreat Course');
+  const [eventType, setEventType] = useState<EventType>(TAXONOMY.eventTypes[0]);
   const [startDate, setStartDate] = useState('2026-12-01');
   const [endDate, setEndDate] = useState('2026-12-01');
   const [timeRange, setTimeRange] = useState('');
   const [locationOrLink, setLocationOrLink] = useState('');
   const [teacher, setTeacher] = useState('');
-  const [status, setStatus] = useState<EventStatus>('Registration Open');
+  const [status, setStatus] = useState<EventStatus>(TAXONOMY.eventStatuses[0]);
   const [description, setDescription] = useState('');
   const [linkedFormTabId, setLinkedFormTabId] = useState(formTabs[0]?.id || '');
   const [formError, setFormError] = useState<string | null>(null);
@@ -97,7 +61,6 @@ export function EventsCalendarSection({
     return [...base].sort((a, b) => a.startDate.localeCompare(b.startDate));
   }, [events, selectedType]);
 
-  // Calendar Grid cells for (calYear, calMonth)
   const calendarDays = useMemo(() => {
     const firstDayOfWeek = new Date(Date.UTC(calYear, calMonth, 1)).getUTCDay();
     const daysInMonth = new Date(Date.UTC(calYear, calMonth + 1, 0)).getUTCDate();
@@ -146,15 +109,16 @@ export function EventsCalendarSection({
   };
 
   const openCreateModal = () => {
+    const defaultDate = new Date().toISOString().slice(0, 10);
     setEditingEvent(null);
     setTitle('');
-    setEventType('Retreat Course');
-    setStartDate('2026-12-06');
-    setEndDate('2026-12-06');
+    setEventType(TAXONOMY.eventTypes[0]);
+    setStartDate(defaultDate);
+    setEndDate(defaultDate);
     setTimeRange('09:00 – 17:00');
     setLocationOrLink('Main Dhamma Hall');
     setTeacher('Group Sayadaw & Practice Leaders');
-    setStatus('Registration Open');
+    setStatus(TAXONOMY.eventStatuses[0]);
     setDescription('');
     setLinkedFormTabId(formTabs[0]?.id || '');
     setFormError(null);
@@ -205,85 +169,69 @@ export function EventsCalendarSection({
   };
 
   const handleDownloadIcs = (evt: GroupEvent) => {
-    const ics = eventToIcs(evt);
-    triggerFileDownload(`${evt.id}.ics`, ics, 'text/calendar;charset=utf-8');
+    triggerFileDownload(`${evt.id}.ics`, eventToIcs(evt), 'text/calendar;charset=utf-8');
   };
 
   return (
-    <section
-      id="events-section"
-      className="border-t border-[#E5DFD3] dark:border-[#342E28] bg-[#F4EFE6]/45 dark:bg-[#1E1A16]"
-    >
-      <div className="mx-auto max-w-[1200px] px-4 py-14 sm:px-8 sm:py-16">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-[#E5DFD3] dark:border-[#342E28]">
-          <div className="space-y-2 max-w-2xl">
-            <p className="text-xs tracking-widest uppercase text-[#78716C] dark:text-[#A8A29E]">
-              04. Courses &amp; Calendar
-            </p>
-            <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#1C1917] dark:text-[#F5F5F4] text-balance">
-              Meditation Courses &amp; Group Calendar Events
-            </h2>
-            <p className="text-sm sm:text-base leading-relaxed text-[#57534E] dark:text-[#A8A29E]">
-              Retreats, weekly group sittings, and Sayadaw seminars organized by our Vipassana
-              Bhavana community.
-            </p>
-          </div>
+    <section id="events-section" className={THEME_CLASSES.band}>
+      <div className={THEME_CLASSES.sectionContainer}>
+        <SectionHeader
+          kicker="04. Courses & Calendar"
+          title="Meditation Courses & Group Calendar Events"
+          description={`Retreats, weekly group sittings, and Sayadaw seminars organized by our ${SITE_CONFIG.brandTitle} community.`}
+          actions={
+            <>
+              <div
+                role="group"
+                aria-label="Events view mode"
+                className={`flex items-center border ${THEME_CLASSES.borderStrong}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode('list');
+                    setSelectedDayIso(null);
+                  }}
+                  className={`inline-flex items-center gap-1.5 min-h-[40px] px-3.5 text-xs font-medium cursor-pointer transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-[var(--ink-primary)] text-[var(--surface-canvas)]'
+                      : THEME_CLASSES.inkMuted
+                  }`}
+                >
+                  <List className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Schedule</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('calendar')}
+                  className={`inline-flex items-center gap-1.5 min-h-[40px] px-3.5 text-xs font-medium cursor-pointer transition-colors ${
+                    viewMode === 'calendar'
+                      ? 'bg-[var(--ink-primary)] text-[var(--surface-canvas)]'
+                      : THEME_CLASSES.inkMuted
+                  }`}
+                >
+                  <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Calendar</span>
+                </button>
+              </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div
-              role="group"
-              aria-label="Events view mode"
-              className="flex items-center border border-[#D6CEBE] dark:border-[#44403C]"
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('list');
-                  setSelectedDayIso(null);
-                }}
-                className={`inline-flex items-center gap-1.5 min-h-[40px] px-3.5 text-xs font-medium cursor-pointer transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-[#1C1917] text-[#FBF9F5] dark:bg-[#F5F5F4] dark:text-[#1C1917]'
-                    : 'text-[#57534E] dark:text-[#A8A29E]'
-                }`}
-              >
-                <List className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Schedule</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('calendar')}
-                className={`inline-flex items-center gap-1.5 min-h-[40px] px-3.5 text-xs font-medium cursor-pointer transition-colors ${
-                  viewMode === 'calendar'
-                    ? 'bg-[#1C1917] text-[#FBF9F5] dark:bg-[#F5F5F4] dark:text-[#1C1917]'
-                    : 'text-[#57534E] dark:text-[#A8A29E]'
-                }`}
-              >
-                <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Calendar</span>
-              </button>
-            </div>
-
-            {isOwner && (
-              <button
-                type="button"
-                onClick={openCreateModal}
-                className="inline-flex items-center gap-2 min-h-[42px] px-4 py-2 text-xs font-medium bg-[#1C1917] text-[#FBF9F5] hover:bg-[#9A3412] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#FDBA74] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                <span>Add Course / Event</span>
-              </button>
-            )}
-          </div>
-        </div>
+              {isOwner && (
+                <button type="button" onClick={openCreateModal} className={THEME_CLASSES.btnPrimary}>
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  <span>Add Course / Event</span>
+                </button>
+              )}
+            </>
+          }
+        />
 
         {/* Event Type Filter Bar */}
         <div
           role="tablist"
           aria-label="Filter events by type"
-          className="flex items-center gap-1.5 overflow-x-auto py-5 border-b border-[#E5DFD3] dark:border-[#342E28]"
+          className={`flex items-center gap-1.5 overflow-x-auto py-5 border-b ${THEME_CLASSES.borderHairline}`}
         >
-          {EVENT_TYPES.map((t) => {
+          {EVENT_FILTER_TYPES.map((t) => {
             const active = selectedType === t;
             return (
               <button
@@ -294,8 +242,8 @@ export function EventsCalendarSection({
                 onClick={() => setSelectedType(t)}
                 className={`min-h-[40px] px-3.5 py-1.5 text-xs font-medium transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer ${
                   active
-                    ? 'bg-[#1C1917] text-[#FBF9F5] dark:bg-[#F5F5F4] dark:text-[#1C1917]'
-                    : 'bg-[#FBF9F5] text-[#57534E] hover:text-[#1C1917] dark:bg-[#25211D] dark:text-[#A8A29E] dark:hover:text-[#F5F5F4]'
+                    ? 'bg-[var(--ink-primary)] text-[var(--surface-canvas)]'
+                    : 'bg-[var(--surface-canvas)] text-[var(--ink-muted)] hover:text-[var(--ink-primary)]'
                 }`}
               >
                 {t === 'All' ? 'All Events' : t}
@@ -308,15 +256,15 @@ export function EventsCalendarSection({
         {viewMode === 'calendar' && (
           <div className="pt-8 pb-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
-                {MONTH_NAMES[calMonth]} {calYear}
+              <h3 className={`font-display text-2xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
+                {TAXONOMY.monthNames[calMonth]} {calYear}
               </h3>
               <div className="flex items-center gap-2">
                 {selectedDayIso && (
                   <button
                     type="button"
                     onClick={() => setSelectedDayIso(null)}
-                    className="min-h-[36px] px-3 text-xs text-[#9A3412] dark:text-[#FDBA74] underline cursor-pointer"
+                    className={`min-h-[36px] px-3 text-xs ${THEME_CLASSES.accentInk} underline cursor-pointer`}
                   >
                     Show All Dates
                   </button>
@@ -325,7 +273,7 @@ export function EventsCalendarSection({
                   type="button"
                   onClick={handlePrevMonth}
                   aria-label="Previous month"
-                  className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer"
+                  className={`min-h-[40px] min-w-[40px] inline-flex items-center justify-center border ${THEME_CLASSES.borderStrong} ${THEME_CLASSES.inkPrimary} hover:border-[var(--accent-ink)] cursor-pointer`}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -333,18 +281,18 @@ export function EventsCalendarSection({
                   type="button"
                   onClick={handleNextMonth}
                   aria-label="Next month"
-                  className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer"
+                  className={`min-h-[40px] min-w-[40px] inline-flex items-center justify-center border ${THEME_CLASSES.borderStrong} ${THEME_CLASSES.inkPrimary} hover:border-[var(--accent-ink)] cursor-pointer`}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-7 border-t border-l border-[#D6CEBE] dark:border-[#342E28]">
-              {WEEKDAYS.map((wd) => (
+            <div className={`grid grid-cols-7 border-t border-l ${THEME_CLASSES.borderStrong}`}>
+              {TAXONOMY.weekdays.map((wd) => (
                 <div
                   key={wd}
-                  className="py-2 px-2 text-center text-[11px] uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E] bg-[#FBF9F5] dark:bg-[#181512] border-r border-b border-[#D6CEBE] dark:border-[#342E28]"
+                  className={`py-2 px-2 text-center text-[11px] uppercase tracking-wider ${THEME_CLASSES.inkSubtle} bg-[var(--surface-canvas)] border-r border-b ${THEME_CLASSES.borderStrong}`}
                 >
                   {wd}
                 </div>
@@ -355,7 +303,7 @@ export function EventsCalendarSection({
                   return (
                     <div
                       key={`empty-${idx}`}
-                      className="min-h-[76px] sm:min-h-[92px] bg-[#EFEAE0]/35 dark:bg-[#181512]/50 border-r border-b border-[#D6CEBE] dark:border-[#342E28]"
+                      className={`min-h-[76px] sm:min-h-[92px] bg-[var(--surface-elevated)]/40 border-r border-b ${THEME_CLASSES.borderStrong}`}
                     />
                   );
                 }
@@ -367,19 +315,19 @@ export function EventsCalendarSection({
                     key={cell.iso}
                     type="button"
                     onClick={() => setSelectedDayIso(isSelected ? null : cell.iso)}
-                    className={`min-h-[76px] sm:min-h-[92px] p-2 text-left flex flex-col justify-between border-r border-b border-[#D6CEBE] dark:border-[#342E28] transition-colors cursor-pointer ${
+                    className={`min-h-[76px] sm:min-h-[92px] p-2 text-left flex flex-col justify-between border-r border-b ${THEME_CLASSES.borderStrong} transition-colors cursor-pointer ${
                       isSelected
-                        ? 'bg-[#9A3412]/10 dark:bg-[#B45309]/20'
+                        ? 'bg-[var(--accent-primary)]/15'
                         : hasEvents
-                          ? 'bg-[#FBF9F5] dark:bg-[#221E1A] hover:bg-[#EFEAE0]/70'
-                          : 'bg-[#FBF9F5]/60 dark:bg-[#1B1815] hover:bg-[#EFEAE0]/40'
+                          ? 'bg-[var(--surface-canvas)] hover:bg-[var(--surface-elevated)]/70'
+                          : 'bg-[var(--surface-canvas)]/60 hover:bg-[var(--surface-elevated)]/40'
                     }`}
                   >
                     <span
                       className={`font-mono-code text-xs tabular-nums ${
                         hasEvents
-                          ? 'font-semibold text-[#9A3412] dark:text-[#FDBA74]'
-                          : 'text-[#78716C] dark:text-[#A8A29E]'
+                          ? `font-semibold ${THEME_CLASSES.accentInk}`
+                          : THEME_CLASSES.inkSubtle
                       }`}
                     >
                       {cell.dayNum}
@@ -390,13 +338,13 @@ export function EventsCalendarSection({
                         {cell.dayEvents.slice(0, 2).map((evt) => (
                           <p
                             key={evt.id}
-                            className="text-[11px] leading-tight font-medium text-[#1C1917] dark:text-[#F5F5F4] truncate"
+                            className={`text-[11px] leading-tight font-medium ${THEME_CLASSES.inkPrimary} truncate`}
                           >
                             {evt.title}
                           </p>
                         ))}
                         {cell.dayEvents.length > 2 && (
-                          <p className="text-[10px] text-[#78716C] tabular-nums">
+                          <p className={`text-[10px] ${THEME_CLASSES.inkSubtle} tabular-nums`}>
                             +{cell.dayEvents.length - 2} more
                           </p>
                         )}
@@ -412,57 +360,53 @@ export function EventsCalendarSection({
         {/* Schedule / Filtered Day Event List */}
         {displayedEvents.length === 0 ? (
           <div className="py-12 text-center space-y-3">
-            <p className="font-display text-2xl font-medium text-[#1C1917] dark:text-[#F5F5F4]">
+            <p className={`font-display text-2xl font-medium ${THEME_CLASSES.inkPrimary}`}>
               {selectedDayIso
                 ? `No scheduled events on ${selectedDayIso}`
-                : 'No group courses or events match this filter'}
+                : 'No group courses or events yet'}
             </p>
             <div className="flex justify-center gap-3">
               {selectedDayIso && (
                 <button
                   type="button"
                   onClick={() => setSelectedDayIso(null)}
-                  className="min-h-[40px] px-4 py-2 text-xs border border-[#D6CEBE] dark:border-[#44403C] cursor-pointer"
+                  className={THEME_CLASSES.btnOutline}
                 >
                   Show All Dates
                 </button>
               )}
               {isOwner && (
-                <button
-                  type="button"
-                  onClick={openCreateModal}
-                  className="min-h-[40px] px-4 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] cursor-pointer"
-                >
+                <button type="button" onClick={openCreateModal} className={THEME_CLASSES.btnAccent}>
                   Add Course / Event
                 </button>
               )}
             </div>
           </div>
         ) : (
-          <div className="pt-4 divide-y divide-[#E5DFD3] dark:divide-[#342E28]">
+          <div className={`pt-4 ${THEME_CLASSES.divideHairline}`}>
             {displayedEvents.map((evt) => (
               <article
                 key={evt.id}
                 className="py-7 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
               >
                 <div className="lg:col-span-3 space-y-1">
-                  <p className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74] tabular-nums">
+                  <p className={`font-mono-code text-xs ${THEME_CLASSES.accentInk} tabular-nums`}>
                     {formatDateRange(evt.startDate, evt.endDate)}
                   </p>
-                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">{evt.timeRange}</p>
-                  <p className="text-xs font-medium text-[#292524] dark:text-[#E7E5E4] pt-1">
+                  <p className={`text-xs ${THEME_CLASSES.inkMuted}`}>{evt.timeRange}</p>
+                  <p className={`text-xs font-medium ${THEME_CLASSES.inkBody} pt-1`}>
                     {evt.eventType} · {evt.status}
                   </p>
                 </div>
 
                 <div className="lg:col-span-6 space-y-2">
-                  <h3 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]">
+                  <h3 className={`font-display text-2xl font-semibold ${THEME_CLASSES.inkPrimary}`}>
                     {evt.title}
                   </h3>
-                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                  <p className={`text-xs ${THEME_CLASSES.inkMuted}`}>
                     {evt.teacher} · {evt.locationOrLink}
                   </p>
-                  <p className="text-sm leading-[1.7] text-[#44403C] dark:text-[#D6D3D1] pt-1">
+                  <p className={`text-sm leading-[1.7] ${THEME_CLASSES.inkSecondary} pt-1`}>
                     {evt.description}
                   </p>
                 </div>
@@ -473,7 +417,7 @@ export function EventsCalendarSection({
                       <button
                         type="button"
                         onClick={() => onRegisterWithForm(evt.linkedFormTabId!)}
-                        className="min-h-[40px] px-4 py-2 text-xs font-medium bg-[#1C1917] text-[#FBF9F5] hover:bg-[#9A3412] dark:bg-[#F5F5F4] dark:text-[#1C1917] dark:hover:bg-[#FDBA74] transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                        className={THEME_CLASSES.btnPrimary}
                       >
                         Register via Form
                       </button>
@@ -481,7 +425,7 @@ export function EventsCalendarSection({
                     <button
                       type="button"
                       onClick={() => handleDownloadIcs(evt)}
-                      className="inline-flex items-center gap-1.5 min-h-[40px] px-3 py-2 text-xs border border-[#D6CEBE] dark:border-[#44403C] text-[#1C1917] dark:text-[#F5F5F4] hover:border-[#9A3412] cursor-pointer whitespace-nowrap shrink-0"
+                      className={THEME_CLASSES.btnOutline}
                     >
                       <Download className="h-3.5 w-3.5" aria-hidden="true" />
                       <span>Add to Calendar (.ics)</span>
@@ -489,46 +433,26 @@ export function EventsCalendarSection({
                   </div>
 
                   {isOwner && (
-                    <div className="flex items-center gap-3 text-xs text-[#78716C] dark:text-[#A8A29E]">
+                    <div className={`flex items-center gap-3 text-xs ${THEME_CLASSES.inkSubtle}`}>
                       <button
                         type="button"
                         onClick={() => openEditModal(evt)}
-                        className="inline-flex items-center gap-1 hover:text-[#1C1917] dark:hover:text-[#F5F5F4] cursor-pointer"
+                        className="inline-flex items-center gap-1 hover:text-[var(--ink-primary)] cursor-pointer"
                       >
                         <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>Edit</span>
                       </button>
 
-                      {confirmDeleteId !== evt.id ? (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(evt.id)}
-                          className="inline-flex items-center gap-1 hover:text-[#9A3412] dark:hover:text-[#FCA5A5] cursor-pointer"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                          <span>Delete</span>
-                        </button>
-                      ) : (
-                        <span className="inline-flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onDeleteEvent(evt.id);
-                              setConfirmDeleteId(null);
-                            }}
-                            className="text-[#9A3412] dark:text-[#FCA5A5] font-medium underline cursor-pointer"
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteId(null)}
-                            className="cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                        </span>
-                      )}
+                      <ConfirmDeleteAction
+                        isConfirming={confirmDeleteId === evt.id}
+                        onRequestConfirm={() => setConfirmDeleteId(evt.id)}
+                        onConfirm={() => {
+                          onDeleteEvent(evt.id);
+                          setConfirmDeleteId(null);
+                        }}
+                        onCancel={() => setConfirmDeleteId(null)}
+                        ariaLabel={`Delete ${evt.title}`}
+                      />
                     </div>
                   )}
                 </div>
@@ -538,210 +462,155 @@ export function EventsCalendarSection({
         )}
       </div>
 
-      {/* In-app Course / Event Editor Modal */}
-      {isOwner && isModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="event-modal-heading"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#1C1917]/60 backdrop-blur-[2px] p-4"
+      {isOwner && (
+        <EditorModal
+          isOpen={isModalOpen}
+          headingId="event-modal-heading"
+          kicker="Group Meditation Schedule"
+          title={editingEvent ? 'Edit Course / Event' : 'Add Course or Calendar Event'}
+          error={formError}
+          onClose={() => setIsModalOpen(false)}
         >
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[#FBF9F5] dark:bg-[#181512] border border-[#D6CEBE] dark:border-[#342E28] p-6 sm:p-8 shadow-xl">
-            <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#E5DFD3] dark:border-[#342E28]">
-              <div>
-                <p className="font-mono-code text-xs text-[#9A3412] dark:text-[#FDBA74]">
-                  Group Meditation Schedule
-                </p>
-                <h3
-                  id="event-modal-heading"
-                  className="font-display text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F5F4]"
+          <form onSubmit={handleSubmitEvent} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className={THEME_CLASSES.label}>Course / Event Title *</label>
+              <input
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g., 3-Day Weekend Satipaṭṭhāna Retreat"
+                className={THEME_CLASSES.input}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className={THEME_CLASSES.label}>Event Type</label>
+                <select
+                  value={eventType}
+                  onChange={(e) => setEventType(e.target.value as EventType)}
+                  className={THEME_CLASSES.input}
                 >
-                  {editingEvent ? 'Edit Course / Event' : 'Add Course or Calendar Event'}
-                </h3>
+                  {TAXONOMY.eventTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              <div className="space-y-1.5">
+                <label className={THEME_CLASSES.label}>Registration Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as EventStatus)}
+                  className={THEME_CLASSES.input}
+                >
+                  {TAXONOMY.eventStatuses.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className={THEME_CLASSES.label}>Start Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className={THEME_CLASSES.inputMono}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className={THEME_CLASSES.label}>End Date</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={THEME_CLASSES.inputMono}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className={THEME_CLASSES.label}>Daily Hours</label>
+                <input
+                  type="text"
+                  value={timeRange}
+                  onChange={(e) => setTimeRange(e.target.value)}
+                  placeholder="e.g., 08:30 – 17:00"
+                  className={THEME_CLASSES.input}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className={THEME_CLASSES.label}>Teacher / Sayadaw</label>
+                <input
+                  type="text"
+                  value={teacher}
+                  onChange={(e) => setTeacher(e.target.value)}
+                  placeholder="e.g., Ven. Dr. Nandamālābhivaṃsa"
+                  className={THEME_CLASSES.input}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className={THEME_CLASSES.label}>Location or Online Link</label>
+                <input
+                  type="text"
+                  value={locationOrLink}
+                  onChange={(e) => setLocationOrLink(e.target.value)}
+                  placeholder="e.g., Main Dhamma Hall & Zoom"
+                  className={THEME_CLASSES.input}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className={THEME_CLASSES.label}>Linked Registration Form Tab</label>
+                <select
+                  value={linkedFormTabId}
+                  onChange={(e) => setLinkedFormTabId(e.target.value)}
+                  className={THEME_CLASSES.input}
+                >
+                  <option value="">None</option>
+                  {formTabs.map((tab) => (
+                    <option key={tab.id} value={tab.id}>
+                      {tab.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className={THEME_CLASSES.label}>Course Details &amp; Guidelines</label>
+              <textarea
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe prerequisites, precepts, meal arrangements, or study materials..."
+                className={THEME_CLASSES.textarea}
+              />
+            </div>
+
+            <div className={`pt-4 border-t ${THEME_CLASSES.borderHairline} flex justify-end gap-3`}>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                aria-label="Close modal"
-                className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center text-[#57534E] hover:text-[#1C1917] dark:text-[#A8A29E] cursor-pointer"
+                className={THEME_CLASSES.btnSecondary}
               >
-                <X className="h-5 w-5" />
+                Cancel
+              </button>
+              <button type="submit" className={THEME_CLASSES.btnAccent}>
+                {editingEvent ? 'Update Event' : 'Save Event'}
               </button>
             </div>
-
-            <form onSubmit={handleSubmitEvent} className="pt-5 space-y-4">
-              {formError && (
-                <div
-                  role="alert"
-                  className="p-3 border border-[#9A3412]/50 bg-[#9A3412]/5 text-xs text-[#9A3412] dark:text-[#FCA5A5]"
-                >
-                  {formError}
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                  Course / Event Title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., 3-Day Weekend Satipaṭṭhāna Retreat"
-                  className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                    Event Type
-                  </label>
-                  <select
-                    value={eventType}
-                    onChange={(e) => setEventType(e.target.value as EventType)}
-                    className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                  >
-                    {EVENT_TYPES.filter((t): t is EventType => t !== 'All').map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                    Registration Status
-                  </label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as EventStatus)}
-                    className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                  >
-                    {EVENT_STATUSES.map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                    Start Date *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full min-h-[42px] px-3 py-2 text-sm font-mono-code bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full min-h-[42px] px-3 py-2 text-sm font-mono-code bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                    Daily Hours
-                  </label>
-                  <input
-                    type="text"
-                    value={timeRange}
-                    onChange={(e) => setTimeRange(e.target.value)}
-                    placeholder="e.g., 08:30 – 17:00"
-                    className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                    Teacher / Sayadaw
-                  </label>
-                  <input
-                    type="text"
-                    value={teacher}
-                    onChange={(e) => setTeacher(e.target.value)}
-                    placeholder="e.g., Ven. Dr. Nandamālābhivaṃsa"
-                    className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                    Location or Online Link
-                  </label>
-                  <input
-                    type="text"
-                    value={locationOrLink}
-                    onChange={(e) => setLocationOrLink(e.target.value)}
-                    placeholder="e.g., Main Dhamma Hall & Zoom"
-                    className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                    Linked Registration Form Tab
-                  </label>
-                  <select
-                    value={linkedFormTabId}
-                    onChange={(e) => setLinkedFormTabId(e.target.value)}
-                    className="w-full min-h-[42px] px-3 py-2 text-sm bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                  >
-                    <option value="">None</option>
-                    {formTabs.map((tab) => (
-                      <option key={tab.id} value={tab.id}>
-                        {tab.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-[#44403C] dark:text-[#D6D3D1]">
-                  Course Details &amp; Guidelines
-                </label>
-                <textarea
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe prerequisites, precepts, meal arrangements, or study materials..."
-                  className="w-full px-3 py-2 text-sm leading-relaxed bg-[#F4EFE6]/60 dark:bg-[#221E1A] text-[#1C1917] dark:text-[#F5F5F4] border border-[#D6CEBE] dark:border-[#3F3832] focus:outline-none focus:border-[#9A3412]"
-                />
-              </div>
-
-              <div className="pt-4 border-t border-[#E5DFD3] dark:border-[#342E28] flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="min-h-[42px] px-4 py-2 text-xs font-medium border border-[#D6CEBE] dark:border-[#44403C] text-[#44403C] dark:text-[#D6D3D1] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="min-h-[42px] px-5 py-2 text-xs font-medium bg-[#9A3412] text-[#FBF9F5] hover:bg-[#7C2D12] cursor-pointer"
-                >
-                  {editingEvent ? 'Update Event' : 'Save Event'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+          </form>
+        </EditorModal>
       )}
     </section>
   );
