@@ -1,64 +1,51 @@
 {
   "version": 1,
-  "updatedAt": "2026-11-20T06:53:50.677Z",
+  "updatedAt": "2026-11-20T07:08:09.327Z",
   "sayadaws": [],
   "discourses": [],
-  "deletedPaths": [
-    "content/articles/dhamma-talks-by-mogok-sayadaw/ven-mogok/pt05-02-stopping-and-contemplation.rst"
-  ],
+  "deletedPaths": [],
   "tips": [],
   "events": [
     {
       "id": "evt-satipatthana-10day",
       "title": "10-Day Satipaṭṭhāna Vipassanā Course",
       "eventType": "Retreat Course",
-      "startDate": "2026-12-04",
-      "endDate": "2026-12-13",
+      "startDate": "2027-03-31",
+      "endDate": "2027-03-31",
       "timeRange": "05:00 – 21:00 Daily (Noble Silence)",
       "locationOrLink": "Group Retreat Hall · Main Dhamma Sanctuary",
       "teacher": "Ven. Dr. Nandamālābhivaṃsa & Senior Assistant Sayadaw",
       "status": "Registration Open",
       "description": "Ten-day intensive retreat following the Mahāsatipaṭṭhāna Sutta with alternating sitting and walking periods, evening Abhidhamma & Vipassanā discourses, and daily teacher interviews.",
-      "linkedFormTabId": "form-course-registration"
+      "linkedFormTabId": "form-volunteer-dana",
+      "isUserCreated": true
     },
     {
       "id": "evt-weekly-sunday-sitting",
-      "title": "Weekly Sunday Group Sitting & Abhidhamma Study",
+      "title": "Daily Meditation Practice",
       "eventType": "Group Sitting",
       "startDate": "2026-11-22",
       "endDate": "2026-11-22",
-      "timeRange": "09:00 – 11:30",
-      "locationOrLink": "Dhamma Study Room & Online Stream",
+      "timeRange": "04:30 – 05:30",
+      "locationOrLink": "Dhama Study Room & Online Stream",
       "teacher": "Group Practice Facilitators",
-      "status": "Drop-In Welcome",
-      "description": "One-hour silent Vipassanā sitting followed by 30 minutes of walking meditation, chanting of the Mettā Sutta, and guided reading from Fundamental Abhidhamma.",
-      "linkedFormTabId": "form-course-registration"
+      "status": "Registration Open",
+      "description": "One-hour silent Vipassanā sitting",
+      "isUserCreated": true
     },
     {
       "id": "evt-paticcasamuppada-seminar",
-      "title": "Practical Paṭiccasamuppāda Seminar (Mogok Tradition)",
+      "title": "Questions to Sayadaw Parami (Mogok Tradition)",
       "eventType": "Dhamma Talk",
-      "startDate": "2026-11-29",
-      "endDate": "2026-11-29",
+      "startDate": "2026-11-20",
+      "endDate": "2026-11-20",
       "timeRange": "14:00 – 16:30",
-      "locationOrLink": "Main Hall & Hybrid Q&A",
-      "teacher": "Ven. Bhikkhu Uttamo",
+      "locationOrLink": "https://us06web.zoom.us/j/87804585528?pwd=yh4JOrq2knCGhnI3fuMqusZSXwVVCG.1",
+      "teacher": "Ven. Parami",
       "status": "Registration Open",
       "description": "Focused afternoon discourse and Q&A exploring how contemplation of consciousness (cittānupassanā) severs the link between feeling (vedanā) and craving (taṇhā).",
-      "linkedFormTabId": "form-dhamma-questions"
-    },
-    {
-      "id": "evt-full-moon-uposatha",
-      "title": "Full-Moon Uposatha One-Day Mindfulness Retreat",
-      "eventType": "Study Circle",
-      "startDate": "2026-12-20",
-      "endDate": "2026-12-20",
-      "timeRange": "08:00 – 17:00",
-      "locationOrLink": "Group Dhamma Center",
-      "teacher": "Senior Monastic Sangha",
-      "status": "Registration Open",
-      "description": "One-day Eight Precepts observance with guided Ānāpānasati sitting, mindful vegetarian lunch, and group sutta recitation.",
-      "linkedFormTabId": "form-course-registration"
+      "linkedFormTabId": "form-dhamma-questions",
+      "isUserCreated": true
     }
   ],
   "formTabs": [
